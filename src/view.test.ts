@@ -182,10 +182,12 @@ describe('getViewerHtml', () => {
     expect(html).toContain('nav');
   });
 
-  it('uses dark theme colors', () => {
+  it('uses CSS custom properties for theming', () => {
     const html = getViewerHtml(baseData);
-    expect(html).toContain('#0a0a0a');
-    expect(html).toContain('#111');
+    expect(html).toContain('--bg:');
+    expect(html).toContain('--surface:');
+    expect(html).toContain('var(--bg)');
+    expect(html).toContain('var(--surface)');
   });
 
   it('includes responsive styles', () => {
@@ -193,8 +195,8 @@ describe('getViewerHtml', () => {
     expect(html).toContain('@media (max-width: 768px)');
   });
 
-  it('binds to 127.0.0.1 in mermaid dark theme config', () => {
+  it('initializes mermaid with theme-aware config', () => {
     const html = getViewerHtml(baseData);
-    expect(html).toContain("theme: 'dark'");
+    expect(html).toContain("theme: isDark ? 'dark' : 'default'");
   });
 });

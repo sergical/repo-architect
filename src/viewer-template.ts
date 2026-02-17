@@ -29,98 +29,139 @@ export function getViewerHtml(data: ViewerData): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(data.projectName)} - Architecture</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/geist@1/dist/fonts/geist-sans/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/geist@1/dist/fonts/geist-mono/style.css">
+<script>
+(function() {
+  var t = localStorage.getItem('viewer-theme') ||
+    (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
 <style>
+  :root[data-theme="dark"] {
+    --bg: #09090b;
+    --surface: #18181b;
+    --border: #27272a;
+    --text: #fafafa;
+    --muted: #a1a1aa;
+    --accent: #3b82f6;
+    --success: #22c55e;
+    --hover-bg: #1f1f23;
+    --active-bg: #172554;
+  }
+  :root[data-theme="light"] {
+    --bg: #ffffff;
+    --surface: #f4f4f5;
+    --border: #e4e4e7;
+    --text: #09090b;
+    --muted: #71717a;
+    --accent: #2563eb;
+    --success: #16a34a;
+    --hover-bg: #f4f4f5;
+    --active-bg: #dbeafe;
+  }
+
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html { font-size: 16px; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #0a0a0a; color: #e0e0e0;
+    font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg); color: var(--text);
     display: flex; min-height: 100vh;
   }
 
   /* Sidebar */
   .sidebar {
     width: 260px; min-width: 260px;
-    background: #111; border-right: 1px solid #222;
+    background: var(--surface); border-right: 1px solid var(--border);
     padding: 24px 16px; display: flex; flex-direction: column;
     position: fixed; top: 0; left: 0; bottom: 0; overflow-y: auto;
     z-index: 10;
   }
-  .sidebar-brand {
-    font-size: 14px; font-weight: 600; color: #888;
-    letter-spacing: 0.05em; text-transform: uppercase;
-    margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #222;
+  .sidebar-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border);
   }
-  .sidebar-brand span { color: #c084fc; }
+  .sidebar-brand {
+    font-size: 14px; font-weight: 600; color: var(--muted);
+    letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .sidebar-brand span { color: var(--accent); }
+  .theme-toggle {
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    padding: 4px 6px; cursor: pointer; color: var(--muted); font-size: 14px;
+    line-height: 1; transition: color 0.15s, border-color 0.15s;
+  }
+  .theme-toggle:hover { color: var(--text); border-color: var(--muted); }
   .nav-item {
     display: block; padding: 8px 12px; margin-bottom: 2px;
     border-radius: 6px; cursor: pointer; font-size: 14px;
-    color: #aaa; text-decoration: none; transition: all 0.15s;
+    color: var(--muted); text-decoration: none; transition: all 0.15s;
   }
-  .nav-item:hover { background: #1a1a1a; color: #e0e0e0; }
-  .nav-item.active { background: #1e1b2e; color: #c084fc; }
-  .nav-item.overview { font-weight: 600; color: #ccc; margin-bottom: 12px; }
-  .nav-item.overview.active { color: #c084fc; }
+  .nav-item:hover { background: var(--hover-bg); color: var(--text); }
+  .nav-item.active { background: var(--active-bg); color: var(--accent); }
+  .nav-item.overview { font-weight: 600; color: var(--text); margin-bottom: 12px; }
+  .nav-item.overview.active { color: var(--accent); }
   .nav-section {
-    font-size: 11px; font-weight: 600; color: #555;
+    font-size: 11px; font-weight: 600; color: var(--muted);
     text-transform: uppercase; letter-spacing: 0.08em;
-    padding: 8px 12px 4px; margin-top: 8px;
+    padding: 8px 12px 4px; margin-top: 8px; opacity: 0.6;
   }
   .sidebar-footer {
-    margin-top: auto; padding-top: 16px; border-top: 1px solid #222;
-    font-size: 12px; color: #444;
+    margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--muted); opacity: 0.6;
   }
 
   /* Toggle button for mobile */
   .sidebar-toggle {
     display: none; position: fixed; top: 12px; left: 12px; z-index: 20;
-    background: #1a1a1a; border: 1px solid #333; border-radius: 6px;
-    color: #aaa; padding: 8px 12px; cursor: pointer; font-size: 14px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--muted); padding: 8px 12px; cursor: pointer; font-size: 14px;
   }
 
   /* Main content */
   .main { margin-left: 260px; flex: 1; padding: 48px 64px; max-width: 900px; }
 
   /* Markdown styles */
-  .main h1 { font-size: 2em; font-weight: 700; margin-bottom: 8px; color: #f0f0f0; }
+  .main h1 { font-size: 2em; font-weight: 700; margin-bottom: 8px; color: var(--text); }
   .main h2 {
     font-size: 1.4em; font-weight: 600; margin-top: 40px; margin-bottom: 16px;
-    color: #e0e0e0; padding-bottom: 8px; border-bottom: 1px solid #222;
+    color: var(--text); padding-bottom: 8px; border-bottom: 1px solid var(--border);
   }
-  .main h3 { font-size: 1.15em; font-weight: 600; margin-top: 28px; margin-bottom: 12px; color: #d0d0d0; }
-  .main p { line-height: 1.7; margin-bottom: 16px; color: #bbb; }
-  .main a { color: #a78bfa; text-decoration: none; }
+  .main h3 { font-size: 1.15em; font-weight: 600; margin-top: 28px; margin-bottom: 12px; color: var(--text); }
+  .main p { line-height: 1.7; margin-bottom: 16px; color: var(--muted); }
+  .main a { color: var(--accent); text-decoration: none; }
   .main a:hover { text-decoration: underline; }
-  .main ul, .main ol { margin-bottom: 16px; padding-left: 24px; color: #bbb; }
+  .main ul, .main ol { margin-bottom: 16px; padding-left: 24px; color: var(--muted); }
   .main li { margin-bottom: 6px; line-height: 1.6; }
   .main blockquote {
-    border-left: 3px solid #333; padding: 8px 16px; margin-bottom: 16px;
-    color: #888; font-style: italic;
+    border-left: 3px solid var(--border); padding: 8px 16px; margin-bottom: 16px;
+    color: var(--muted); font-style: italic;
   }
   .main code {
-    background: #1a1a1a; padding: 2px 6px; border-radius: 4px;
-    font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.9em; color: #c084fc;
+    background: var(--surface); padding: 2px 6px; border-radius: 4px;
+    font-family: 'Geist Mono', 'SF Mono', 'Fira Code', monospace; font-size: 0.9em; color: var(--accent);
   }
   .main pre {
-    background: #111; border: 1px solid #222; border-radius: 8px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
     padding: 16px; margin-bottom: 20px; overflow-x: auto;
   }
-  .main pre code { background: none; padding: 0; color: #ccc; }
+  .main pre code { background: none; padding: 0; color: var(--text); }
   .main table {
     width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.95em;
   }
   .main th {
-    text-align: left; padding: 10px 12px; border-bottom: 2px solid #333;
-    color: #aaa; font-weight: 600;
+    text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--border);
+    color: var(--muted); font-weight: 600;
   }
-  .main td { padding: 10px 12px; border-bottom: 1px solid #1a1a1a; color: #bbb; }
-  .main tr:hover td { background: #111; }
+  .main td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--muted); }
+  .main tr:hover td { background: var(--surface); }
   .main img { max-width: 100%; border-radius: 8px; }
-  .main hr { border: none; border-top: 1px solid #222; margin: 32px 0; }
+  .main hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
 
   /* Mermaid diagrams */
   .mermaid-wrap {
-    background: #111; border: 1px solid #222; border-radius: 8px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
     margin-bottom: 20px; position: relative; overflow: hidden;
     cursor: grab; min-height: 80px;
   }
@@ -133,28 +174,28 @@ export function getViewerHtml(data: ViewerData): string {
     position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; z-index: 2;
   }
   .mermaid-controls button {
-    background: #1a1a1a; border: 1px solid #333; border-radius: 4px;
-    color: #888; width: 28px; height: 28px; cursor: pointer;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+    color: var(--muted); width: 28px; height: 28px; cursor: pointer;
     font-size: 14px; display: flex; align-items: center; justify-content: center;
   }
-  .mermaid-controls button:hover { color: #ccc; border-color: #555; }
+  .mermaid-controls button:hover { color: var(--text); border-color: var(--muted); }
   .mermaid-error {
-    background: #1a1212; border: 1px solid #332222; border-radius: 8px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
     padding: 16px; margin-bottom: 20px;
   }
   .mermaid-error summary {
-    color: #c07070; cursor: pointer; font-size: 13px; margin-bottom: 8px;
+    color: #ef4444; cursor: pointer; font-size: 13px; margin-bottom: 8px;
   }
   .mermaid-error pre {
-    margin: 0; border: none; background: transparent; font-size: 13px; color: #888;
+    margin: 0; border: none; background: transparent; font-size: 13px; color: var(--muted);
   }
 
   /* Empty state */
   .empty-state {
     text-align: center; padding: 80px 40px;
   }
-  .empty-state h2 { border: none; color: #888; }
-  .empty-state p { color: #555; }
+  .empty-state h2 { border: none; color: var(--muted); }
+  .empty-state p { color: var(--muted); opacity: 0.6; }
   .empty-state code { font-size: 1em; }
 
   /* Responsive */
@@ -171,7 +212,10 @@ export function getViewerHtml(data: ViewerData): string {
 <button class="sidebar-toggle" id="sidebar-toggle">&#9776; Menu</button>
 
 <nav class="sidebar" id="sidebar">
-  <div class="sidebar-brand"><span>repo</span>-architect</div>
+  <div class="sidebar-header">
+    <div class="sidebar-brand"><span>repo</span>-architect</div>
+    <button class="theme-toggle" id="theme-toggle" title="Toggle theme">&#9788;</button>
+  </div>
   <div id="nav"></div>
   <div class="sidebar-footer" id="footer"></div>
 </nav>
@@ -183,25 +227,55 @@ export function getViewerHtml(data: ViewerData): string {
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>
 // Local-only viewer: all data comes from the user's own docs/architecture/ files.
-// innerHTML is used intentionally to render trusted local markdown via marked.js.
+// Safe innerHTML usage: renders trusted local markdown via marked.js and
+// mermaid SVG output — both sourced exclusively from user's own filesystem.
 (function() {
   var data = window.__ARCH_DATA__;
 
-  mermaid.initialize({
-    startOnLoad: false,
-    theme: 'dark',
-    suppressErrorRendering: true,
-    themeVariables: {
-      darkMode: true,
-      background: '#111',
-      primaryColor: '#2d2250',
-      primaryTextColor: '#e0e0e0',
-      primaryBorderColor: '#444',
-      lineColor: '#555',
-      secondaryColor: '#1a1a2e',
-      tertiaryColor: '#1a1a1a',
-    },
+  // Theme toggle
+  var themeBtn = document.getElementById('theme-toggle');
+  function getTheme() { return document.documentElement.getAttribute('data-theme') || 'dark'; }
+  function updateThemeIcon() { themeBtn.textContent = getTheme() === 'dark' ? '\\u2606' : '\\u263E'; }
+  updateThemeIcon();
+  themeBtn.addEventListener('click', function() {
+    var next = getTheme() === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('viewer-theme', next);
+    updateThemeIcon();
+    initMermaid();
+    showContent(currentTarget);
   });
+
+  var currentTarget = 'overview';
+
+  function initMermaid() {
+    var isDark = getTheme() === 'dark';
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: isDark ? 'dark' : 'default',
+      suppressErrorRendering: true,
+      themeVariables: isDark ? {
+        darkMode: true,
+        background: '#18181b',
+        primaryColor: '#27272a',
+        primaryTextColor: '#fafafa',
+        primaryBorderColor: '#3f3f46',
+        lineColor: '#71717a',
+        secondaryColor: '#1f1f23',
+        tertiaryColor: '#09090b',
+      } : {
+        darkMode: false,
+        background: '#f4f4f5',
+        primaryColor: '#e4e4e7',
+        primaryTextColor: '#09090b',
+        primaryBorderColor: '#d4d4d8',
+        lineColor: '#71717a',
+        secondaryColor: '#fafafa',
+        tertiaryColor: '#ffffff',
+      },
+    });
+  }
+  initMermaid();
 
   // Store raw mermaid sources separately, render via API
   var mermaidSources = [];
@@ -230,9 +304,7 @@ export function getViewerHtml(data: ViewerData): string {
   // Auto-fix common mermaid syntax issues and retry
   function fixMermaidSyntax(src) {
     var fixed = src;
-    // Quote unquoted edge labels containing special chars: |label| -> |"label"|
     fixed = fixed.replace(/\\|([^"|][^|]*[/\\\\@#&;][^|]*)\\|/g, '|"$1"|');
-    // Remove trailing whitespace on lines (some mermaid versions choke on it)
     fixed = fixed.replace(/[ \\t]+$/gm, '');
     return fixed;
   }
@@ -241,7 +313,6 @@ export function getViewerHtml(data: ViewerData): string {
     try {
       return await mermaid.render(id, src);
     } catch (e) {
-      // Try auto-fixed version
       var fixed = fixMermaidSyntax(src);
       if (fixed !== src) {
         return await mermaid.render(id + '-fix', fixed);
@@ -250,7 +321,7 @@ export function getViewerHtml(data: ViewerData): string {
     }
   }
 
-  // Render mermaid diagrams via API (no HTML escaping issues)
+  // Render mermaid diagrams via API
   async function renderMermaidDiagrams() {
     var wraps = content.querySelectorAll('.mermaid-wrap');
     for (var i = 0; i < wraps.length; i++) {
@@ -260,10 +331,10 @@ export function getViewerHtml(data: ViewerData): string {
       var inner = wrap.querySelector('.mermaid-inner');
       try {
         var result = await tryRenderMermaid('mermaid-' + Date.now() + '-' + idx, src);
-        inner.innerHTML = result.svg;
+        // Safe: SVG output from mermaid.render(), sourced from local markdown files
+        setSvgContent(inner, result.svg);
         addZoomPan(wrap, inner);
       } catch (err) {
-        // Show raw code on error
         wrap.classList.add('mermaid-error');
         wrap.style.overflow = 'visible';
         var details = document.createElement('details');
@@ -282,6 +353,18 @@ export function getViewerHtml(data: ViewerData): string {
     }
   }
 
+  // Parse and insert SVG safely via DOMParser
+  function setSvgContent(el, svgString) {
+    while (el.firstChild) el.removeChild(el.firstChild);
+    var fixed = svgString.replace(/<br\\s*(?!\\/)>/gi, '<br/>');
+    var parser = new DOMParser();
+    var doc = parser.parseFromString(fixed, 'image/svg+xml');
+    var svg = doc.documentElement;
+    if (svg && svg.nodeName === 'svg') {
+      el.appendChild(document.importNode(svg, true));
+    }
+  }
+
   // Zoom + pan for mermaid diagrams
   function addZoomPan(wrap, inner) {
     var scale = 1, tx = 0, ty = 0;
@@ -293,7 +376,6 @@ export function getViewerHtml(data: ViewerData): string {
 
     function resetView() { scale = 1; tx = 0; ty = 0; apply(); }
 
-    // Zoom controls
     var controls = document.createElement('div');
     controls.className = 'mermaid-controls';
     var btnIn = document.createElement('button');
@@ -313,7 +395,6 @@ export function getViewerHtml(data: ViewerData): string {
     controls.appendChild(btnReset);
     wrap.appendChild(controls);
 
-    // Wheel zoom
     wrap.addEventListener('wheel', function(e) {
       e.preventDefault();
       var rect = wrap.getBoundingClientRect();
@@ -322,13 +403,11 @@ export function getViewerHtml(data: ViewerData): string {
       var oldScale = scale;
       var delta = e.deltaY > 0 ? 0.9 : 1.1;
       scale = Math.min(Math.max(scale * delta, 0.2), 5);
-      // Zoom toward cursor
       tx = mx - (mx - tx) * (scale / oldScale);
       ty = my - (my - ty) * (scale / oldScale);
       apply();
     }, { passive: false });
 
-    // Drag pan
     wrap.addEventListener('mousedown', function(e) {
       if (e.button !== 0) return;
       dragging = true; startX = e.clientX; startY = e.clientY;
@@ -383,7 +462,8 @@ export function getViewerHtml(data: ViewerData): string {
   function onNavClick(e) {
     nav.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
     e.currentTarget.classList.add('active');
-    showContent(e.currentTarget.dataset.target);
+    currentTarget = e.currentTarget.dataset.target;
+    showContent(currentTarget);
     document.getElementById('sidebar').classList.remove('open');
   }
 
@@ -410,7 +490,8 @@ export function getViewerHtml(data: ViewerData): string {
       return;
     }
 
-    // Rendering trusted local markdown content via marked.js
+    // Safe: rendering trusted local markdown content via marked.js
+    // Data sourced exclusively from user's own docs/architecture/ files
     content.innerHTML = renderMarkdown(md);
     window.scrollTo(0, 0);
 

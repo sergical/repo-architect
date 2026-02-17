@@ -19,7 +19,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prepublishOnly": "npm run build && npm test"
+    "prepublishOnly": "npm run build && npm test",
+    "site:dev": "cd site && bun run dev",
+    "site:build": "cd site && bun run build",
+    "site:preview": "cd site && bun run preview"
   },
   "keywords": [
     "architecture",

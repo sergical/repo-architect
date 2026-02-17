@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <!-- Blueprint grid background -->
+  <rect width="128" height="128" rx="28" fill="#3b82f6"/>
+
+  <!-- Stylized architecture bracket / building frame -->
+  <!-- Left bracket -->
+  <path d="M38 32 L28 32 Q24 32 24 36 L24 92 Q24 96 28 96 L38 96" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Right bracket -->
+  <path d="M90 32 L100 32 Q104 32 104 36 L104 92 Q104 96 100 96 L90 96" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- Inner structure nodes + connections (architecture diagram) -->
+  <!-- Top node -->
+  <rect x="50" y="34" width="28" height="12" rx="3" fill="#fff"/>
+  <!-- Middle left node -->
+  <rect x="36" y="58" width="24" height="12" rx="3" fill="#fff" opacity="0.75"/>
+  <!-- Middle right node -->
+  <rect x="68" y="58" width="24" height="12" rx="3" fill="#fff" opacity="0.75"/>
+  <!-- Bottom node -->
+  <rect x="50" y="82" width="28" height="12" rx="3" fill="#fff"/>
+
+  <!-- Connections -->
+  <line x1="57" y1="46" x2="48" y2="58" stroke="#fff" stroke-width="2.5" opacity="0.5"/>
+  <line x1="71" y1="46" x2="80" y2="58" stroke="#fff" stroke-width="2.5" opacity="0.5"/>
+  <line x1="48" y1="70" x2="57" y2="82" stroke="#fff" stroke-width="2.5" opacity="0.5"/>
+  <line x1="80" y1="70" x2="71" y2="82" stroke="#fff" stroke-width="2.5" opacity="0.5"/>
+</svg>

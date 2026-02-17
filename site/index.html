@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>repo-architect — Your codebase, documented. Automatically.</title>
+  <meta name="description" content="Automated architecture documentation with Mermaid diagrams, powered by Claude AI. Run once, get system maps, data flows, and module docs.">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; scroll-behavior: smooth; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0a; color: #e0e0e0; line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: #c084fc; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* Layout */
+    .container { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
+    section { padding: 80px 0; }
+
+    /* Hero */
+    .hero { padding: 100px 0 60px; text-align: center; }
+    .hero-brand {
+      font-size: 3rem; font-weight: 800; letter-spacing: -0.02em;
+      color: #fff; margin-bottom: 12px;
+    }
+    .hero-brand span { color: #c084fc; }
+    .hero-tagline {
+      font-size: 1.25rem; color: #888; margin-bottom: 48px; max-width: 520px;
+      margin-left: auto; margin-right: auto;
+    }
+    .hero-diagram {
+      background: #111; border: 1px solid #1e1e1e; border-radius: 12px;
+      overflow: hidden; position: relative; cursor: grab;
+      margin: 0 auto; max-width: 900px;
+    }
+    .hero-diagram:active { cursor: grabbing; }
+    .hero-diagram .diagram-inner {
+      transform-origin: 0 0; padding: 24px; min-width: min-content;
+    }
+    .hero-diagram .diagram-inner svg { display: block; margin: 0 auto; max-width: none; }
+    .hero-cta { margin-top: 40px; }
+    .cta-cmd {
+      display: inline-block; background: #111; border: 1px solid #2a2a2a;
+      border-radius: 8px; padding: 14px 28px;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 1rem; color: #c084fc; cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .cta-cmd:hover { border-color: #c084fc; background: #12101a; }
+    .cta-cmd::before { content: '$ '; color: #555; }
+
+    /* Diagram controls (shared) */
+    .diagram-controls {
+      position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; z-index: 2;
+    }
+    .diagram-controls button {
+      background: #1a1a1a; border: 1px solid #333; border-radius: 4px;
+      color: #888; width: 28px; height: 28px; cursor: pointer;
+      font-size: 14px; display: flex; align-items: center; justify-content: center;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .diagram-controls button:hover { color: #ccc; border-color: #555; }
+
+    /* How it works */
+    .how-it-works { border-top: 1px solid #151515; }
+    .how-it-works .layout {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: start;
+    }
+    .section-label {
+      font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.1em; color: #c084fc; margin-bottom: 12px;
+    }
+    .section-title {
+      font-size: 1.8rem; font-weight: 700; color: #fff; margin-bottom: 32px;
+    }
+    .step {
+      display: flex; gap: 16px; margin-bottom: 28px;
+    }
+    .step-num {
+      flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%;
+      background: #1e1b2e; color: #c084fc; font-weight: 700; font-size: 0.85rem;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .step h3 { font-size: 1rem; font-weight: 600; color: #fff; margin-bottom: 4px; }
+    .step p { font-size: 0.9rem; color: #888; }
+    .how-diagram {
+      background: #111; border: 1px solid #1e1e1e; border-radius: 12px;
+      overflow: hidden; position: relative; cursor: grab;
+    }
+    .how-diagram:active { cursor: grabbing; }
+    .how-diagram .diagram-inner {
+      transform-origin: 0 0; padding: 20px; min-width: min-content;
+    }
+    .how-diagram .diagram-inner svg { display: block; margin: 0 auto; max-width: none; }
+
+    /* Features */
+    .features { border-top: 1px solid #151515; text-align: center; }
+    .features .section-title { margin-bottom: 48px; }
+    .features-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;
+    }
+    .feature-card {
+      background: #111; border: 1px solid #1e1e1e; border-radius: 12px;
+      padding: 28px 20px; text-align: left;
+      transition: border-color 0.2s;
+    }
+    .feature-card:hover { border-color: #2a2a2a; }
+    .feature-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      background: #1e1b2e; display: flex; align-items: center; justify-content: center;
+      margin-bottom: 16px; font-size: 18px;
+    }
+    .feature-card h3 {
+      font-size: 0.95rem; font-weight: 600; color: #fff; margin-bottom: 8px;
+    }
+    .feature-card p { font-size: 0.85rem; color: #777; line-height: 1.5; }
+
+    /* Gallery */
+    .gallery { border-top: 1px solid #151515; }
+    .gallery .section-title { text-align: center; margin-bottom: 40px; }
+    .gallery-tabs {
+      display: flex; justify-content: center; gap: 4px; margin-bottom: 24px;
+    }
+    .gallery-tab {
+      padding: 8px 20px; border-radius: 6px; border: 1px solid transparent;
+      background: transparent; color: #888; cursor: pointer;
+      font-size: 0.9rem; font-family: inherit; transition: all 0.15s;
+    }
+    .gallery-tab:hover { color: #ccc; }
+    .gallery-tab.active {
+      background: #1e1b2e; color: #c084fc; border-color: #2d2250;
+    }
+    .gallery-panel {
+      display: none; background: #111; border: 1px solid #1e1e1e;
+      border-radius: 12px; overflow: hidden; position: relative; cursor: grab;
+      max-width: 900px; margin: 0 auto;
+    }
+    .gallery-panel:active { cursor: grabbing; }
+    .gallery-panel.active { display: block; }
+    .gallery-panel .diagram-inner {
+      transform-origin: 0 0; padding: 24px; min-width: min-content;
+    }
+    .gallery-panel .diagram-inner svg { display: block; margin: 0 auto; max-width: none; }
+
+    /* Quick start */
+    .quickstart { border-top: 1px solid #151515; text-align: center; }
+    .quickstart .section-title { margin-bottom: 40px; }
+    .terminal {
+      background: #111; border: 1px solid #1e1e1e; border-radius: 12px;
+      padding: 28px 32px; text-align: left; max-width: 640px; margin: 0 auto;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 0.85rem; line-height: 1.8; overflow-x: auto;
+    }
+    .terminal .prompt { color: #c084fc; }
+    .terminal .cmd { color: #fff; }
+    .terminal .output { color: #555; }
+    .terminal .success { color: #6ec96e; }
+    .terminal-dots {
+      display: flex; gap: 6px; margin-bottom: 16px;
+    }
+    .terminal-dots span {
+      width: 10px; height: 10px; border-radius: 50%; background: #2a2a2a;
+    }
+    .quickstart-ctas {
+      margin-top: 40px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid #151515; text-align: center;
+      padding: 40px 24px; color: #444; font-size: 0.85rem;
+    }
+    footer a { color: #666; }
+    footer a:hover { color: #c084fc; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .hero-brand { font-size: 2rem; }
+      .how-it-works .layout { grid-template-columns: 1fr; }
+      .features-grid { grid-template-columns: 1fr 1fr; }
+      section { padding: 60px 0; }
+    }
+    @media (max-width: 480px) {
+      .features-grid { grid-template-columns: 1fr; }
+      .hero-brand { font-size: 1.6rem; }
+      .terminal { padding: 20px 16px; font-size: 0.8rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="container">
+    <h1 class="hero-brand"><span>repo</span>-architect</h1>
+    <p class="hero-tagline">Your codebase, documented. Automatically. Every night.</p>
+
+    <div class="hero-diagram" id="hero-diagram">
+      <div class="diagram-inner" id="hero-inner"></div>
+    </div>
+
+    <div class="hero-cta">
+      <span class="cta-cmd" id="cta-hero">npx repo-architect</span>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how-it-works">
+  <div class="container">
+    <div class="layout">
+      <div>
+        <div class="section-label">How it works</div>
+        <h2 class="section-title">One command. Full architecture docs.</h2>
+
+        <div class="step">
+          <div class="step-num">1</div>
+          <div>
+            <h3>Scan</h3>
+            <p>Repomix extracts your entire codebase into a structured format — any language, any framework.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div>
+            <h3>Analyze</h3>
+            <p>Claude reads the full codebase and identifies modules, data flows, dependencies, and key abstractions.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div>
+            <h3>Render</h3>
+            <p>Generates Markdown docs with Mermaid diagrams — system maps, sequence diagrams, class diagrams, and more.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="how-diagram" id="how-diagram">
+        <div class="diagram-inner" id="how-inner"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="features">
+  <div class="container">
+    <div class="section-label">Features</div>
+    <h2 class="section-title">Everything you need to keep docs in sync</h2>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </div>
+        <h3>Mermaid Diagrams</h3>
+        <p>System maps, data flows, dependency graphs, class diagrams. Renders natively on GitHub.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        </div>
+        <h3>Incremental Updates</h3>
+        <p>Only regenerates docs when structural changes are detected. Preserves your hand-written notes.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <h3>Nightly PR</h3>
+        <p>GitHub Action runs every night, opens a PR with updated docs. Zero maintenance.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </div>
+        <h3>Local Viewer</h3>
+        <p>Interactive HTML viewer with zoom/pan diagrams, dark theme, and sidebar navigation. <code style="background:#1e1b2e;color:#c084fc;padding:2px 6px;border-radius:4px;font-size:0.8em">--view</code></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- GALLERY -->
+<section class="gallery">
+  <div class="container">
+    <div class="section-label">Real output</div>
+    <h2 class="section-title">Generated from repo-architect's own codebase</h2>
+
+    <div class="gallery-tabs">
+      <button class="gallery-tab active" data-panel="gallery-overview">System Map</button>
+      <button class="gallery-tab" data-panel="gallery-module">Module Detail</button>
+      <button class="gallery-tab" data-panel="gallery-flows">Data Flows</button>
+    </div>
+
+    <div class="gallery-panel active" id="gallery-overview">
+      <div class="diagram-inner" id="gallery-overview-inner"></div>
+    </div>
+    <div class="gallery-panel" id="gallery-module">
+      <div class="diagram-inner" id="gallery-module-inner"></div>
+    </div>
+    <div class="gallery-panel" id="gallery-flows">
+      <div class="diagram-inner" id="gallery-flows-inner"></div>
+    </div>
+  </div>
+</section>
+
+<!-- QUICK START -->
+<section class="quickstart">
+  <div class="container">
+    <div class="section-label">Get started</div>
+    <h2 class="section-title">Up and running in 30 seconds</h2>
+
+    <div class="terminal">
+      <div class="terminal-dots"><span></span><span></span><span></span></div>
+      <div><span class="prompt">$</span> <span class="cmd">npx repo-architect</span></div>
+      <br>
+      <div class="output">&nbsp; repo-architect - documenting your codebase</div>
+      <br>
+      <div class="success">&nbsp; &#10004; Scanned 142 files</div>
+      <div class="success">&nbsp; &#10004; Identified 8 modules</div>
+      <div class="success">&nbsp; &#10004; Wrote 9 files</div>
+      <br>
+      <div class="output">&nbsp; Generated files:</div>
+      <div class="success">&nbsp;&nbsp;&nbsp; + docs/architecture/OVERVIEW.md</div>
+      <div class="success">&nbsp;&nbsp;&nbsp; + docs/architecture/modules/api.md</div>
+      <div class="success">&nbsp;&nbsp;&nbsp; + docs/architecture/modules/auth.md</div>
+      <div class="output">&nbsp;&nbsp;&nbsp; ...</div>
+      <br>
+      <div class="success">&nbsp; Done! Docs at docs/architecture/</div>
+      <br>
+      <div><span class="prompt">$</span> <span class="cmd">npx repo-architect --view</span></div>
+      <div class="output">&nbsp; Viewer running at http://127.0.0.1:3333</div>
+    </div>
+
+    <div class="quickstart-ctas">
+      <span class="cta-cmd" id="cta-quickstart1">npx repo-architect</span>
+      <span class="cta-cmd" id="cta-quickstart2">npx repo-architect --view</span>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <p><a href="https://github.com/sergical/repo-architect">GitHub</a> &middot; Built with <a href="https://claude.ai">Claude</a></p>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+// Homepage: all diagram content is hardcoded from repo-architect's own generated docs.
+// SVG output from mermaid.render() is inserted via DOM manipulation below.
+(function() {
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'dark',
+    suppressErrorRendering: true,
+    themeVariables: {
+      darkMode: true,
+      background: '#111',
+      primaryColor: '#2d2250',
+      primaryTextColor: '#e0e0e0',
+      primaryBorderColor: '#444',
+      lineColor: '#555',
+      secondaryColor: '#1a1a2e',
+      tertiaryColor: '#1a1a1a',
+    },
+  });
+
+  // Real diagram sources from repo-architect's own generated docs
+  var diagrams = {
+    hero: [
+      'graph TD',
+      '    CLI[CLI Entry Point<br/>cli.ts] --> Scanner[Repository Scanner<br/>scan.ts]',
+      '    CLI --> Analyzer[AI Analysis Engine<br/>analyze.ts]',
+      '    CLI --> Renderer[Documentation Renderer<br/>render.ts]',
+      '    CLI --> State[State Manager<br/>state.ts]',
+      '    CLI --> Diff[Git Diff Tracker<br/>diff.ts]',
+      '    CLI --> PR[PR Creator<br/>pr.ts]',
+      '    CLI --> Setup[GitHub Action Setup<br/>setup.ts]',
+      '    Scanner --> |repomix| RepoFiles[Repository Files]',
+      '    Diff --> |git commands| GitHistory[Git History]',
+      '    Analyzer --> |API calls| Claude[Claude AI]',
+      '    Analyzer --> Prompts[Prompt Templates<br/>prompts/]',
+      '    Renderer --> Docs[docs/architecture/<br/>OVERVIEW.md + modules/]',
+      '    State --> StateFile[.arch-state.json]',
+      '    PR --> |gh CLI| GitHub[GitHub PR]',
+    ].join('\n'),
+
+    howItWorks: [
+      'sequenceDiagram',
+      '    participant User',
+      '    participant CLI',
+      '    participant Scanner',
+      '    participant Analyzer',
+      '    participant Claude',
+      '    participant Renderer',
+      '    participant Git',
+      '    User->>CLI: npx repo-architect',
+      '    CLI->>Scanner: scanRepo(repoRoot)',
+      '    Scanner->>Scanner: Execute repomix',
+      '    Scanner-->>CLI: ScanResult(content, fileCount)',
+      '    CLI->>Analyzer: analyzeFullRepo(repoContent)',
+      '    Analyzer->>Analyzer: Load analyze-full.md prompt',
+      '    Analyzer->>Claude: messages.create(system+user)',
+      '    Claude-->>Analyzer: JSON AnalysisResult',
+      '    Analyzer-->>CLI: AnalysisResult',
+      '    CLI->>Renderer: renderFullDocs(repoRoot, analysis)',
+      '    Renderer->>Renderer: Generate OVERVIEW.md',
+      '    Renderer->>Renderer: Generate module docs',
+      '    Renderer-->>CLI: changedFiles[]',
+      '    CLI->>Git: createArchPr(files, summary)',
+      '    Git->>Git: Create branch & commit',
+      '    Git->>GitHub: gh pr create',
+      '    GitHub-->>User: Pull Request URL',
+    ].join('\n'),
+
+    galleryOverview: [
+      'graph LR',
+      '    CLI[cli.ts] --> Scan[scan.ts]',
+      '    CLI --> Analyze[analyze.ts]',
+      '    CLI --> Render[render.ts]',
+      '    CLI --> State[state.ts]',
+      '    CLI --> Diff[diff.ts]',
+      '    CLI --> PR[pr.ts]',
+      '    CLI --> Setup[setup.ts]',
+      '    Analyze --> Templates[prompts/templates/]',
+      '    Render --> Analyze',
+      '    Diff --> State',
+      '    PR --> Diff',
+      '    Analyze -.->|"@anthropic-ai/sdk"| External1[Anthropic API]',
+      '    Scan -.->|repomix| External2[Repomix]',
+      '    PR -.->|"git/gh"| External3[Git/GitHub]',
+    ].join('\n'),
+
+    galleryModule: [
+      'classDiagram',
+      '    class AnalysisEngine {',
+      '        +analyzeFullRepo(content) AnalysisResult',
+      '        +analyzeIncremental(content, docs, changes, log) IncrementalAnalysisResult',
+      '        -getApiKey() string',
+      '        -loadPrompt(name) string',
+      '        -parseAnalysisResponse(text) AnalysisResult',
+      '        -parseIncrementalResponse(text) IncrementalAnalysisResult',
+      '    }',
+      '    class AnalysisResult {',
+      '        +projectName: string',
+      '        +overview: string',
+      '        +techStack: string[]',
+      '        +systemMap: string',
+      '        +dataFlows: string',
+      '        +dependencyGraph: string',
+      '        +modules: ModuleAnalysis[]',
+      '    }',
+      '    class IncrementalAnalysisResult {',
+      '        +updatedOverview: string | null',
+      '        +updatedSystemMap: string | null',
+      '        +updatedDataFlows: string | null',
+      '        +updatedDependencyGraph: string | null',
+      '        +updatedModules: ModuleAnalysis[]',
+      '        +newModules: ModuleAnalysis[]',
+      '        +deletedModules: string[]',
+      '    }',
+      '    class ModuleAnalysis {',
+      '        +name: string',
+      '        +path: string',
+      '        +description: string',
+      '        +keyAbstractions: string[]',
+      '        +internalDiagram: string',
+      '    }',
+      '    AnalysisEngine --> AnalysisResult',
+      '    AnalysisEngine --> IncrementalAnalysisResult',
+      '    AnalysisResult --> ModuleAnalysis',
+      '    IncrementalAnalysisResult --> ModuleAnalysis',
+    ].join('\n'),
+
+    galleryFlows: [
+      'flowchart TD',
+      '    Start[main entry] --> Parse[Parse CLI args]',
+      '    Parse --> Version{--version?}',
+      '    Version -->|yes| ShowVer[Show version & exit]',
+      '    Version -->|no| Setup{setup command?}',
+      '    Setup -->|yes| RunSetup[setupGitHubAction]',
+      '    Setup -->|no| CheckState{State exists?}',
+      '    CheckState -->|yes| Incremental[runIncremental]',
+      '    CheckState -->|no| Full[runFull]',
+      '    Full --> Scan1[scanRepo]',
+      '    Scan1 --> Analyze1[analyzeFullRepo]',
+      '    Analyze1 --> Render1[renderFullDocs]',
+      '    Render1 --> Save1[writeState]',
+      '    Save1 --> PR1{--pr flag?}',
+      '    PR1 -->|yes| CreatePR1[createArchPr]',
+      '    Incremental --> Diff[getChangedFiles]',
+      '    Diff --> NoChanges{No structural<br/>changes?}',
+      '    NoChanges -->|yes| Skip[Skip & exit]',
+      '    NoChanges -->|no| Scan2[scanFiles]',
+      '    Scan2 --> Analyze2[analyzeIncremental]',
+      '    Analyze2 --> Render2[renderIncrementalDocs]',
+      '    Render2 --> Save2[writeState]',
+      '    Save2 --> PR2{--pr flag?}',
+      '    PR2 -->|yes| CreatePR2[createArchPr]',
+    ].join('\n'),
+  };
+
+  // Auto-fix mermaid edge labels with special chars
+  function fixMermaidSyntax(src) {
+    var fixed = src;
+    fixed = fixed.replace(/\|([^"|][^|]*[/\\@#&;][^|]*)\|/g, '|"$1"|');
+    fixed = fixed.replace(/[ \t]+$/gm, '');
+    return fixed;
+  }
+
+  async function tryRender(id, src) {
+    try {
+      return await mermaid.render(id, src);
+    } catch (e) {
+      var fixed = fixMermaidSyntax(src);
+      if (fixed !== src) {
+        return await mermaid.render(id + '-fix', fixed);
+      }
+      throw e;
+    }
+  }
+
+  // Zoom + pan for diagram containers
+  function addZoomPan(wrap, inner) {
+    var scale = 1, tx = 0, ty = 0;
+    var dragging = false, startX, startY, startTx, startTy;
+
+    function apply() {
+      inner.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')';
+    }
+    function resetView() { scale = 1; tx = 0; ty = 0; apply(); }
+
+    var controls = document.createElement('div');
+    controls.className = 'diagram-controls';
+    [{ ch: '+', title: 'Zoom in' }, { ch: '\u2212', title: 'Zoom out' }, { ch: '\u21ba', title: 'Reset' }].forEach(function(item) {
+      var btn = document.createElement('button');
+      btn.textContent = item.ch;
+      btn.title = item.title;
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (item.ch === '+') scale = Math.min(scale * 1.25, 5);
+        else if (item.ch === '\u2212') scale = Math.max(scale / 1.25, 0.2);
+        else resetView();
+        apply();
+      });
+      controls.appendChild(btn);
+    });
+    wrap.appendChild(controls);
+
+    wrap.addEventListener('wheel', function(e) {
+      e.preventDefault();
+      var rect = wrap.getBoundingClientRect();
+      var mx = e.clientX - rect.left, my = e.clientY - rect.top;
+      var oldScale = scale;
+      scale = Math.min(Math.max(scale * (e.deltaY > 0 ? 0.9 : 1.1), 0.2), 5);
+      tx = mx - (mx - tx) * (scale / oldScale);
+      ty = my - (my - ty) * (scale / oldScale);
+      apply();
+    }, { passive: false });
+
+    wrap.addEventListener('mousedown', function(e) {
+      if (e.button !== 0) return;
+      dragging = true; startX = e.clientX; startY = e.clientY;
+      startTx = tx; startTy = ty;
+    });
+    window.addEventListener('mousemove', function(e) {
+      if (!dragging) return;
+      tx = startTx + (e.clientX - startX);
+      ty = startTy + (e.clientY - startY);
+      apply();
+    });
+    window.addEventListener('mouseup', function() { dragging = false; });
+  }
+
+  // Insert SVG into a container element safely
+  function setSvg(el, svgString) {
+    while (el.firstChild) el.removeChild(el.firstChild);
+    var parser = new DOMParser();
+    var doc = parser.parseFromString(svgString, 'image/svg+xml');
+    var svg = doc.documentElement;
+    if (svg && svg.nodeName === 'svg') {
+      el.appendChild(document.importNode(svg, true));
+    }
+  }
+
+  // Render all diagrams
+  async function renderAll() {
+    var targets = [
+      { src: diagrams.hero, wrap: 'hero-diagram', inner: 'hero-inner' },
+      { src: diagrams.howItWorks, wrap: 'how-diagram', inner: 'how-inner' },
+      { src: diagrams.galleryOverview, wrap: 'gallery-overview', inner: 'gallery-overview-inner' },
+      { src: diagrams.galleryModule, wrap: 'gallery-module', inner: 'gallery-module-inner' },
+      { src: diagrams.galleryFlows, wrap: 'gallery-flows', inner: 'gallery-flows-inner' },
+    ];
+
+    for (var i = 0; i < targets.length; i++) {
+      var t = targets[i];
+      try {
+        var result = await tryRender('d-' + i + '-' + Date.now(), t.src);
+        var inner = document.getElementById(t.inner);
+        setSvg(inner, result.svg);
+        addZoomPan(document.getElementById(t.wrap), inner);
+      } catch (e) {
+        console.error('Diagram render error:', t.wrap, e);
+      }
+    }
+  }
+
+  // Gallery tab switching
+  document.querySelectorAll('.gallery-tab').forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      document.querySelectorAll('.gallery-tab').forEach(function(t) { t.classList.remove('active'); });
+      document.querySelectorAll('.gallery-panel').forEach(function(p) { p.classList.remove('active'); });
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.panel).classList.add('active');
+    });
+  });
+
+  // Copy-to-clipboard for CTA buttons
+  function setupCopy(id, text) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('click', function() {
+      navigator.clipboard.writeText(text).then(function() {
+        var orig = el.textContent;
+        el.textContent = 'copied!';
+        el.style.color = '#6ec96e';
+        setTimeout(function() { el.textContent = orig; el.style.color = ''; }, 1500);
+      });
+    });
+  }
+  setupCopy('cta-hero', 'npx repo-architect');
+  setupCopy('cta-quickstart1', 'npx repo-architect');
+  setupCopy('cta-quickstart2', 'npx repo-architect --view');
+
+  renderAll();
+})();
+</script>
+</body>
+</html>

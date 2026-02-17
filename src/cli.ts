@@ -14,6 +14,7 @@ import { readState, writeState } from './state.js';
 import { getChangedFiles, getCurrentSha, getGitLogSummary } from './diff.js';
 import { createArchPr } from './pr.js';
 import { setupGitHubAction } from './setup.js';
+import { startViewer } from './view.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -185,12 +186,18 @@ async function main(): Promise<void> {
     .option('--incremental', 'Incremental update (default for subsequent runs)')
     .option('--pr', 'Create a pull request with changes')
     .option('--setup', 'Set up GitHub Action for nightly runs')
+    .option('--view', 'Open local architecture viewer in browser')
     .option('-d, --dir <path>', 'Repository root directory', process.cwd())
     .action(async (opts) => {
       const repoRoot = path.resolve(opts.dir);
 
       if (opts.setup) {
         await setupGitHubAction(repoRoot);
+        return;
+      }
+
+      if (opts.view) {
+        await startViewer(repoRoot);
         return;
       }
 

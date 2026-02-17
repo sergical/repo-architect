@@ -7,3 +7,5 @@ export type { ArchState } from './state.js';
 export { getChangedFiles, getCurrentSha } from './diff.js';
 export { createArchPr } from './pr.js';
 export { setupGitHubAction } from './setup.js';
+export { startViewer } from './view.js';
+export type { ViewerData, ViewerModule } from './viewer-template.js';

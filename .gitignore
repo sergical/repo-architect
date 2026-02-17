@@ -3,3 +3,11 @@ dist/
 *.js.map
 .arch-state.json
 .env*
+site/dist/
+site/node_modules/
+
+# Proprietary skills
+.agents/skills/motion/
+.agents/skills/tailwind/
+.claude/skills/motion
+.claude/skills/tailwind

@@ -49,3 +49,15 @@ Use `agent-browser` skill. See `.agents/skills/agent-browser/SKILL.md`
 
 ## Frontend/UI
 Use `frontend-design` skill. See `.agents/skills/frontend-design/SKILL.md`
+
+## React Composition
+Use `vercel-composition-patterns` skill. See `.agents/skills/vercel-composition-patterns/SKILL.md`
+
+## React Best Practices
+Use `vercel-react-best-practices` skill. See `.agents/skills/vercel-react-best-practices/SKILL.md`
+
+## Motion
+Use `motion` skill. See `.agents/skills/motion/SKILL.md`
+
+## Tailwind
+Use `tailwind` skill. See `.agents/skills/tailwind/SKILL.md`

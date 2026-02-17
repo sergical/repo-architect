@@ -23,7 +23,6 @@ export async function scanRepo(repoRoot: string): Promise<ScanResult> {
     '--style', 'xml',
     '--compress',
     '--no-file-summary',
-    '--no-copy-clipboard',
   ], {
     cwd: repoRoot,
     maxBuffer: 50 * 1024 * 1024, // 50MB
@@ -55,7 +54,6 @@ export async function scanFiles(repoRoot: string, files: string[]): Promise<Scan
     '--style', 'xml',
     '--compress',
     '--no-file-summary',
-    '--no-copy-clipboard',
     ...includeArgs,
   ], {
     cwd: repoRoot,

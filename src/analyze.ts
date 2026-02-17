@@ -33,15 +33,31 @@ export interface IncrementalAnalysisResult {
   deletedModules: string[];
 }
 
-function getApiKey(): string {
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) {
-    throw new Error(
-      'No Anthropic API key found. Set ANTHROPIC_API_KEY environment variable.\n' +
-      'Get one at https://console.anthropic.com/settings/keys'
-    );
+async function getApiKey(): Promise<string> {
+  // 1. Environment variable
+  if (process.env.ANTHROPIC_API_KEY) {
+    return process.env.ANTHROPIC_API_KEY;
   }
-  return key;
+
+  // 2. Config file at ~/.repo-architect
+  const home = process.env.HOME || process.env.USERPROFILE || '';
+  for (const configPath of [
+    path.join(home, '.repo-architect'),
+    path.join(home, '.anthropic', 'api_key'),
+  ]) {
+    try {
+      const key = (await readFile(configPath, 'utf-8')).trim();
+      if (key) return key;
+    } catch {
+      // file doesn't exist
+    }
+  }
+
+  throw new Error(
+    'No Anthropic API key found.\n' +
+    'Set ANTHROPIC_API_KEY env var, or save it to ~/.repo-architect\n' +
+    'Get one at https://console.anthropic.com/settings/keys'
+  );
 }
 
 async function loadPrompt(name: string): Promise<string> {
@@ -50,7 +66,7 @@ async function loadPrompt(name: string): Promise<string> {
 }
 
 export async function analyzeFullRepo(repoContent: string): Promise<AnalysisResult> {
-  const client = new Anthropic({ apiKey: getApiKey() });
+  const client = new Anthropic({ apiKey: await getApiKey() });
   const systemPrompt = await loadPrompt('analyze-full');
 
   const response = await client.messages.create({
@@ -79,7 +95,7 @@ export async function analyzeIncremental(
   changeSummary: string,
   gitLog: string,
 ): Promise<IncrementalAnalysisResult> {
-  const client = new Anthropic({ apiKey: getApiKey() });
+  const client = new Anthropic({ apiKey: await getApiKey() });
   const systemPrompt = await loadPrompt('analyze-incremental');
 
   const response = await client.messages.create({

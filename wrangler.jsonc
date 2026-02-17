@@ -1,0 +1,7 @@
+{
+  "name": "repo-architect",
+  "compatibility_date": "2026-02-17",
+  "assets": {
+    "directory": "./site"
+  }
+}

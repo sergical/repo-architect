@@ -51,8 +51,10 @@ export async function loadViewerData(repoRoot: string): Promise<ViewerData> {
 }
 
 function openBrowser(url: string): void {
-  const cmd = platform() === 'darwin' ? 'open' : 'xdg-open';
-  execFile(cmd, [url]);
+  const p = platform();
+  const cmd = p === 'darwin' ? 'open' : p === 'win32' ? 'cmd' : 'xdg-open';
+  const args = p === 'win32' ? ['/c', 'start', '', url] : [url];
+  execFile(cmd, args, () => {});
 }
 
 function tryPort(port: number): Promise<number> {

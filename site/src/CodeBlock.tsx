@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Clipboard, Check } from 'lucide-react';
 
 const TABS = [
@@ -36,11 +37,20 @@ export function CodeBlock() {
           <button
             key={tab.label}
             onClick={() => setActiveTab(i)}
-            className={`py-2.5 px-3.5 font-mono text-[0.8rem] cursor-pointer transition-colors ${
-              i === activeTab ? 'bg-bg text-accent font-semibold' : 'bg-transparent text-muted font-normal'
-            }`}
+            className="relative py-2.5 px-3.5 font-mono text-[0.8rem] cursor-pointer"
           >
-            {tab.label}
+            {i === activeTab && (
+              <motion.div
+                layoutId="codeblock-tab-indicator"
+                className="absolute inset-0 bg-bg"
+                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+              />
+            )}
+            <span className={`relative z-[1] transition-colors ${
+              i === activeTab ? 'text-accent font-semibold' : 'text-muted font-normal'
+            }`}>
+              {tab.label}
+            </span>
           </button>
         ))}
       </div>
@@ -55,11 +65,33 @@ export function CodeBlock() {
       <button
         onClick={copy}
         aria-label="Copy command"
-        className={`w-10 h-10 flex items-center justify-center border-l border-border cursor-pointer transition-colors shrink-0 ${
-          copied ? 'text-success' : 'text-muted'
-        }`}
+        className="relative w-10 h-10 flex items-center justify-center border-l border-border cursor-pointer shrink-0"
       >
-        {copied ? <Check size={14} /> : <Clipboard size={14} />}
+        <AnimatePresence mode="wait">
+          {copied ? (
+            <motion.span
+              key="check"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.15 }}
+              className="text-success flex items-center justify-center"
+            >
+              <Check size={14} />
+            </motion.span>
+          ) : (
+            <motion.span
+              key="clipboard"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.15 }}
+              className="text-muted flex items-center justify-center"
+            >
+              <Clipboard size={14} />
+            </motion.span>
+          )}
+        </AnimatePresence>
       </button>
     </div>
   );

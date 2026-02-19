@@ -2,28 +2,36 @@
 
 > Path: `src/analyze.ts`
 
-Interfaces with the Anthropic Claude API to analyze repository content and generate structured architecture documentation. Handles both full analysis and incremental updates, with robust JSON parsing including XML-tag fallback extraction.
+Interfaces with the Anthropic Claude API to analyze repository content and generate structured architecture documentation as JSON. Handles both full analysis and incremental delta updates, with robust JSON extraction including XML-tag fallback parsing.
 
 ## Key Abstractions
 
-- AnalysisResult (project overview, diagrams, modules)
-- IncrementalAnalysisResult (delta updates)
-- ModuleAnalysis (per-module documentation)
-- analyzeFullRepo(content): Promise<AnalysisResult>
-- analyzeIncremental(content, docs, changes, log): Promise<IncrementalAnalysisResult>
-- extractJson() with XML-tag fallback
+- AnalysisResult
+- IncrementalAnalysisResult
+- ModuleAnalysis
+- TokenUsage
+- analyzeFullRepo(content, options)
+- analyzeIncremental(content, existingDocs, changeSummary, gitLog, options)
+- parseAnalysisResponse(text)
+- parseIncrementalResponse(text)
+- validateMermaid(diagram)
+- extractJson(text)
+- DEFAULT_MODEL
 
 ## Internal Structure
 
 ```mermaid
 classDiagram
     class AnalysisEngine {
-        +analyzeFullRepo(content) AnalysisResult
+        +analyzeFullRepo(content, options) AnalysisResult
         +analyzeIncremental(content, docs, changes, log) IncrementalAnalysisResult
-        -getApiKey() string
+        +parseAnalysisResponse(text) AnalysisResult
+        +parseIncrementalResponse(text) IncrementalAnalysisResult
+        +validateMermaid(diagram) string
+        -getApiKey(repoRoot) string
         -loadPrompt(name) string
-        -parseAnalysisResponse(text) AnalysisResult
-        -parseIncrementalResponse(text) IncrementalAnalysisResult
+        -extractJson(text) unknown
+        -extractSection(text, tag) string
     }
     class AnalysisResult {
         +string projectName
@@ -37,8 +45,6 @@ classDiagram
     class IncrementalAnalysisResult {
         +string|null updatedOverview
         +string|null updatedSystemMap
-        +string|null updatedDataFlows
-        +string|null updatedDependencyGraph
         +ModuleAnalysis[] updatedModules
         +ModuleAnalysis[] newModules
         +string[] deletedModules

@@ -2,28 +2,27 @@
 
 > Path: `src/scan.ts`
 
-Wrapper around the repomix binary that extracts repository content into XML format. Supports both full repository scanning and targeted file scanning for incremental updates.
+Wraps the repomix binary to extract repository content into XML format suitable for sending to Claude. Supports both full repository scanning and targeted file scanning for incremental updates.
 
 ## Key Abstractions
 
 - ScanResult { content: string, fileCount: number }
-- scanRepo(repoRoot): Promise<ScanResult>
-- scanFiles(repoRoot, files[]): Promise<ScanResult>
-- execFile with repomix binary
+- ScanOptions { ignore?, include? }
+- scanRepo(repoRoot, options)
+- scanFiles(repoRoot, files[])
+- getRepomixBin()
+- wrapScanError(err)
 
 ## Internal Structure
 
 ```mermaid
-classDiagram
-    class Scanner {
-        +scanRepo(repoRoot) ScanResult
-        +scanFiles(repoRoot, files) ScanResult
-        -execFile(repomix, args) Promise
-    }
-    class ScanResult {
-        +string content
-        +number fileCount
-    }
-    Scanner --> ScanResult : returns
-    Scanner ..> Repomix : uses binary
+flowchart LR
+    A[scanRepo / scanFiles] --> B[getRepomixBin]
+    B --> C{Binary found?}
+    C -->|yes| D[execFile repomix]
+    C -->|no| E[wrapScanError]
+    D --> F[Parse stdout]
+    F --> G[Count files]
+    G --> H[ScanResult]
+    D -->|error| E
 ```

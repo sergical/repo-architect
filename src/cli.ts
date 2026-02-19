@@ -20,7 +20,7 @@ import { loadConfig, createDefaultConfig } from './config.js';
 import type { RepoArchitectConfig } from './config.js';
 
 const MODEL_PRICING: Record<string, { input: number; output: number }> = {
-  'claude-sonnet-4-5-20250514': { input: 3, output: 15 },
+  'claude-sonnet-4-6': { input: 3, output: 15 },
 };
 
 function estimateCost(usage: TokenUsage, model: string): number {

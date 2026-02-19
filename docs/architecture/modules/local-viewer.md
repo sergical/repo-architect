@@ -2,30 +2,34 @@
 
 > Path: `src/view.ts + src/viewer-template.ts`
 
-Interactive HTML documentation viewer served on localhost. Loads architecture docs, renders Mermaid diagrams client-side with zoom/pan controls, provides sidebar navigation, and features a dark theme for comfortable reading.
+Interactive HTML documentation viewer served on localhost. Loads architecture docs from disk, injects them as JSON into a self-contained HTML template, and serves it with client-side Mermaid rendering, zoom/pan controls, sidebar navigation, and architecture history browsing.
 
 ## Key Abstractions
 
-- ViewerData { projectName, overview, modules, lastRunAt }
+- ViewerData { projectName, overview, modules, lastRunAt, history }
 - ViewerModule { name, slug, content }
-- loadViewerData(repoRoot): Promise<ViewerData>
-- getViewerHtml(data): string
-- startViewer(repoRoot, port?): Promise<void>
-- HTTP server on port 3333 (or next available)
+- loadViewerData(repoRoot, outputDir?)
+- getViewerHtml(data, options?)
+- startViewer(repoRoot, port?, outputDir?)
+- exportStaticHtml(repoRoot, outputPath?, outputDir?)
+- slugify(name): string
+- findPort(start): number
 
 ## Internal Structure
 
 ```mermaid
 flowchart TD
-    Start[startViewer] --> FindPort[Find available port]
-    FindPort --> Load[loadViewerData]
-    Load --> ReadOverview[Read OVERVIEW.md]
-    Load --> ReadModules[Read modules/*.md]
-    ReadModules --> BuildData[Build ViewerData]
-    BuildData --> Render[getViewerHtml]
-    Render --> Inject[Inject data as JSON]
-    Render --> Template[Generate HTML template]
-    Template --> Server[Start HTTP server]
-    Server --> Browser[Open browser]
-    Browser --> ClientRender[Client-side marked + mermaid rendering]
+    A[startViewer] --> B[findPort from 3333]
+    B --> C[loadViewerData]
+    C --> D[readState]
+    C --> E[Read OVERVIEW.md]
+    C --> F[Read modules/*.md]
+    C --> G[getArchHistory]
+    D & E & F & G --> H[Build ViewerData]
+    H --> I[getViewerHtml]
+    I --> J[Inject JSON payload]
+    I --> K[Generate self-contained HTML]
+    K --> L[Start HTTP server]
+    L --> M[openBrowser]
+    M --> N[Client: marked + mermaid render]
 ```

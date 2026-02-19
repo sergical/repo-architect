@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export const DEFAULT_MODEL = 'claude-sonnet-4-5-20250514';
+export const DEFAULT_MODEL = 'claude-sonnet-4-6';
 
 export interface TokenUsage {
   inputTokens: number;
@@ -202,12 +202,23 @@ export function validateMermaid(diagram: string): string {
   const trimmed = diagram.trim();
   if (!trimmed) return '';
 
-  if (VALID_MERMAID_TYPES.test(trimmed)) return trimmed;
+  let result = trimmed;
+
+  // Replace literal \n inside node labels (e.g. [cli.ts\nEntry Point]) with <br/>
+  result = result.replace(/([[({])([^\])}]*?)\\n([^\])}]*?)([\])}])/g, (_, open, before, after, close) => {
+    const inner = `${before}\\n${after}`.replace(/\\n/g, '<br/>');
+    return `${open}${inner}${close}`;
+  });
+
+  // Quote pipe-delimited edge labels containing special chars (e.g. |prompts/*.md| → |"prompts/*.md"|)
+  result = result.replace(/\|([^"|][^|]*[/*\\@#&;+][^|]*)\|/g, '|"$1"|');
+
+  if (VALID_MERMAID_TYPES.test(result)) return result;
 
   // Heuristic: has arrows but no declaration — prepend graph TD
-  if (trimmed.includes('-->') || trimmed.includes('---')) {
+  if (result.includes('-->') || result.includes('---')) {
     console.warn('  Warning: Mermaid diagram missing type declaration, prepending "graph TD"');
-    return `graph TD\n${trimmed}`;
+    return `graph TD\n${result}`;
   }
 
   console.warn('  Warning: Invalid mermaid diagram content, skipping');

@@ -2,29 +2,32 @@
 
 > Path: `src/diff.ts`
 
-Analyzes git history to identify structural changes since the last documentation run. Classifies changes as structural (requiring re-analysis) or ignorable (tests, configs, docs) to minimize unnecessary AI API calls.
+Analyzes git history to identify structural changes since the last documentation run. Classifies file changes as structural (requiring re-analysis) or ignorable (tests, docs, configs) to minimize unnecessary Claude API calls. Also provides architecture history snapshots.
 
 ## Key Abstractions
 
 - StructuralChange { file, changeType, isStructural }
 - DiffResult { changes, currentSha, summary }
-- getChangedFiles(repoRoot, sinceSha): Promise<DiffResult>
+- ArchSnapshot { commitSha, date, summary, moduleCount }
+- getChangedFiles(repoRoot, sinceSha)
 - isStructuralFile(filepath): boolean
-- getGitLogSummary(repoRoot, sinceSha): Promise<string>
+- getCurrentSha(repoRoot)
+- getGitLogSummary(repoRoot, sinceSha)
+- getArchHistory(repoRoot, limit, outputDir)
+- getSnapshotContent(repoRoot, commitSha, outputDir)
 
 ## Internal Structure
 
 ```mermaid
 flowchart TD
-    Start[getChangedFiles] --> GetSha[getCurrentSha]
-    GetSha --> Diff[git diff-tree]
-    Diff --> Parse[Parse output]
-    Parse --> Classify{For each file}
-    Classify --> Check[isStructuralFile?]
-    Check -->|src/*.ts| Structural[Mark structural=true]
-    Check -->|test/doc| Ignore[Mark structural=false]
-    Structural --> Collect[Collect changes]
-    Ignore --> Collect
-    Collect --> Summary[Generate summary]
-    Summary --> Return[DiffResult]
+    A[getChangedFiles] --> B[getCurrentSha]
+    B --> C[git diff-tree since lastSha]
+    C --> D[Parse changed files]
+    D --> E{For each file}
+    E --> F[isStructuralFile?]
+    F -->|"src/*.ts, package.json"| G[structural=true]
+    F -->|"*.test.ts, docs/, *.md"| H[structural=false]
+    G & H --> I[Collect StructuralChange[]]
+    I --> J[getGitLogSummary]
+    J --> K[DiffResult]
 ```

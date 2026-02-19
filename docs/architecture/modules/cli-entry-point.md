@@ -2,46 +2,41 @@
 
 > Path: `src/cli.ts`
 
-Main command-line interface that orchestrates the entire documentation pipeline. Handles argument parsing, mode selection (full vs incremental), and coordinates all modules to execute the scan-analyze-render-PR workflow.
+Main command-line interface built with Commander.js that orchestrates the entire scan → analyze → render → PR pipeline. Handles argument parsing, mode selection (full, incremental, dry-run, view, setup, export), cost estimation, and coordinates all other modules.
 
 ## Key Abstractions
 
-- Command (commander.js)
-- runFull(repoRoot, createPr)
-- runIncremental(repoRoot, createPr)
-- main() orchestration function
+- runFull(repoRoot, createPr, model, config)
+- runIncremental(repoRoot, createPr, model, config)
+- runDryRun(repoRoot, model, config)
+- estimateCost(usage, model)
+- formatUsage(usage, model)
+- RepoArchitectConfig
 
 ## Internal Structure
 
 ```mermaid
 flowchart TD
-    Start[main entry] --> Parse[Parse CLI args]
-    Parse --> Version{--version?}
-    Version -->|yes| ShowVer[Show version & exit]
-    Version -->|no| Setup{setup command?}
-    
-    Setup -->|yes| RunSetup[setupGitHubAction]
-    Setup -->|no| View{--view?}
-    View -->|yes| StartViewer[startViewer]
-    View -->|no| CheckState{State exists?}
-    
-    CheckState -->|yes| Incremental[runIncremental]
-    CheckState -->|no| Full[runFull]
-    
-    Full --> Scan1[scanRepo]
-    Scan1 --> Analyze1[analyzeFullRepo]
-    Analyze1 --> Render1[renderFullDocs]
-    Render1 --> Save1[writeState]
-    Save1 --> PR1{--pr flag?}
-    PR1 -->|yes| CreatePR1[createArchPr]
-    
-    Incremental --> Diff[getChangedFiles]
-    Diff --> NoChanges{No structural<br/>changes?}
-    NoChanges -->|yes| Skip[Skip & exit]
-    NoChanges -->|no| Scan2[scanFiles]
-    Scan2 --> Analyze2[analyzeIncremental]
-    Analyze2 --> Render2[renderIncrementalDocs]
-    Render2 --> Save2[writeState]
-    Save2 --> PR2{--pr flag?}
-    PR2 -->|yes| CreatePR2[createArchPr]
+    Entry[main] --> ParseArgs[Parse CLI Args]
+    ParseArgs --> LoadConfig[loadConfig]
+    LoadConfig --> Mode{Mode?}
+    Mode -->|setup| Setup[setupGitHubAction]
+    Mode -->|--view| Viewer[startViewer]
+    Mode -->|--export| Export[exportStaticHtml]
+    Mode -->|--dry-run| DryRun[runDryRun]
+    Mode -->|state exists| Incremental[runIncremental]
+    Mode -->|no state| Full[runFull]
+    Full --> S1[scanRepo]
+    S1 --> S2[analyzeFullRepo]
+    S2 --> S3[renderFullDocs]
+    S3 --> S4[writeState]
+    S4 --> S5{--pr?}
+    S5 -->|yes| PR[createArchPr]
+    Incremental --> I1[getChangedFiles]
+    I1 --> I2{Structural<br/>changes?}
+    I2 -->|no| Skip[Exit early]
+    I2 -->|yes| I3[scanFiles]
+    I3 --> I4[analyzeIncremental]
+    I4 --> I5[renderIncrementalDocs]
+    I5 --> I6[writeState]
 ```

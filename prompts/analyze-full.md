@@ -29,6 +29,8 @@ Your response MUST be valid JSON matching this exact schema:
 2. **Mermaid diagrams**:
    - Keep diagrams readable - max ~15 nodes per diagram
    - Use descriptive labels, not just file names
+   - For line breaks in node labels, use `<br/>` (NOT `\n`). Example: `A["cli.ts<br/>CLI Entry Point"]`
+   - For edge labels containing special characters (`*`, `/`, `+`, `&`), wrap in quotes: `-->|"prompts/*.md"|`
    - For the system map, show high-level components and their relationships
    - For data flows, pick 2-3 key operations to diagram
    - For the dependency graph, show which modules depend on which

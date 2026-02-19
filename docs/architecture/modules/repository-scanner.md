@@ -8,10 +8,10 @@ Wraps the repomix binary to extract repository content into XML format suitable 
 
 - ScanResult { content: string, fileCount: number }
 - ScanOptions { ignore?, include? }
-- scanRepo(repoRoot, options)
-- scanFiles(repoRoot, files[])
-- getRepomixBin()
-- wrapScanError(err)
+- scanRepo(repoRoot, options): Promise<ScanResult>
+- scanFiles(repoRoot, files[]): Promise<ScanResult>
+- getRepomixBin(): string
+- wrapScanError(err): Error
 
 ## Internal Structure
 

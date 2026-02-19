@@ -6,8 +6,8 @@ Generates Markdown files with embedded Mermaid diagrams from analysis results. H
 
 ## Key Abstractions
 
-- renderFullDocs(repoRoot, analysis, outputDir)
-- renderIncrementalDocs(repoRoot, analysis, outputDir)
+- renderFullDocs(repoRoot, analysis, outputDir): Promise<string[]>
+- renderIncrementalDocs(repoRoot, analysis, outputDir): Promise<IncrementalRenderResult>
 - renderOverview(analysis): string
 - renderModule(mod): string
 - replaceSection(doc, sectionName, newContent): string
@@ -18,12 +18,12 @@ Generates Markdown files with embedded Mermaid diagrams from analysis results. H
 ```mermaid
 flowchart TD
     A[Render Request] --> B{Full or Incremental?}
-    B -->|Full| C[renderFullDocs]
+    B -->|Full|" C[renderFullDocs]
     C --> D[renderOverview → OVERVIEW.md]
-    C --> E[renderModule × n → modules/*.md]
+    C --> E[renderModule x n → modules/*.md]
     D & E --> F[Write all files]
-    F --> G[Return writtenFiles[]]
-    B -->|Incremental| H[renderIncrementalDocs]
+    F --> G[Return writtenFiles]
+    B -->"|Incremental| H[renderIncrementalDocs]
     H --> I[Load existing OVERVIEW.md]
     H --> J{Overview changed?}
     J -->|yes| K[replaceSection]

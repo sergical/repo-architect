@@ -2,18 +2,18 @@
 
 > Path: `src/view.ts + src/viewer-template.ts`
 
-Interactive HTML documentation viewer served on localhost. Loads architecture docs from disk, injects them as JSON into a self-contained HTML template, and serves it with client-side Mermaid rendering, zoom/pan controls, sidebar navigation, and architecture history browsing.
+Interactive HTML documentation viewer served on localhost. Loads architecture docs from disk, injects them as a JSON payload into a self-contained HTML template, and serves it with client-side Mermaid rendering, zoom/pan controls, sidebar navigation, and architecture history browsing.
 
 ## Key Abstractions
 
 - ViewerData { projectName, overview, modules, lastRunAt, history }
 - ViewerModule { name, slug, content }
-- loadViewerData(repoRoot, outputDir?)
-- getViewerHtml(data, options?)
-- startViewer(repoRoot, port?, outputDir?)
-- exportStaticHtml(repoRoot, outputPath?, outputDir?)
+- loadViewerData(repoRoot, outputDir?): Promise<ViewerData>
+- getViewerHtml(data, options?): string
+- startViewer(repoRoot, port?, outputDir?): Promise<void>
+- exportStaticHtml(repoRoot, outputPath?, outputDir?): Promise<string>
 - slugify(name): string
-- findPort(start): number
+- findPort(start): Promise<number>
 
 ## Internal Structure
 

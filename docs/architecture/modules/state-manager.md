@@ -8,8 +8,8 @@ Persists run state to `docs/architecture/.arch-state.json` to enable incremental
 
 - ArchState { lastCommitSha, lastRunAt, modules, repoRoot }
 - ModuleInfo { name, path, description }
-- readState(repoRoot, outputDir?): ArchState|null
-- writeState(repoRoot, state, outputDir?): void
+- readState(repoRoot, outputDir?): Promise<ArchState | null>
+- writeState(repoRoot, state, outputDir?): Promise<void>
 
 ## Internal Structure
 

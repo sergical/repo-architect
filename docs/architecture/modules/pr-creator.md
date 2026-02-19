@@ -6,9 +6,9 @@ Automates the GitHub pull request workflow for documentation updates. Creates a 
 
 ## Key Abstractions
 
-- PrResult { branch, prUrl }
-- createArchPr(repoRoot, changedFiles, summary, docsPath?)
-- isGhInstalled(): boolean
+- PrResult { branch: string, prUrl: string | null }
+- createArchPr(repoRoot, changedFiles, summary, docsPath?): Promise<PrResult>
+- isGhInstalled(): Promise<boolean>
 - Branch naming: arch-docs-YYYYMMDD-HHMMSS
 
 ## Internal Structure

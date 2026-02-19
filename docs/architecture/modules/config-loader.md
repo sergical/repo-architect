@@ -8,8 +8,8 @@ Loads per-repository configuration from `repo-architect.config.json`, applying d
 
 - RepoArchitectConfig { outputDir, ignore, include, model }
 - DEFAULT_CONFIG
-- loadConfig(dir): RepoArchitectConfig
-- createDefaultConfig(dir): string
+- loadConfig(dir): Promise<RepoArchitectConfig>
+- createDefaultConfig(dir): Promise<string>
 
 ## Internal Structure
 

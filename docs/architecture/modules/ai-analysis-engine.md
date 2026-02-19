@@ -10,6 +10,7 @@ Interfaces with the Anthropic Claude API to analyze repository content and gener
 - IncrementalAnalysisResult
 - ModuleAnalysis
 - TokenUsage
+- AnalyzeOptions
 - analyzeFullRepo(content, options)
 - analyzeIncremental(content, existingDocs, changeSummary, gitLog, options)
 - parseAnalysisResponse(text)
@@ -43,8 +44,8 @@ classDiagram
         +ModuleAnalysis[] modules
     }
     class IncrementalAnalysisResult {
-        +string|null updatedOverview
-        +string|null updatedSystemMap
+        +string|"null updatedOverview
+        +string"|null updatedSystemMap
         +ModuleAnalysis[] updatedModules
         +ModuleAnalysis[] newModules
         +string[] deletedModules

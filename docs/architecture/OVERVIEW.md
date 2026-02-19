@@ -4,13 +4,13 @@
 
 ## Overview
 
-repo-architect is an automated architecture documentation generator that leverages Claude AI (Anthropic) to analyze codebases and produce comprehensive, living documentation. The tool scans repositories using repomix, sends the extracted content to Claude for structural analysis, and generates Markdown documentation with Mermaid diagrams — including system maps, data flows, dependency graphs, and per-module class diagrams. The output lives in `docs/architecture/` and renders natively on GitHub.
+repo-architect is an automated architecture documentation generator that analyzes codebases using Claude AI (Anthropic) and produces living Markdown documentation with Mermaid diagrams. Given a repository, it scans the codebase using the repomix binary to produce XML-formatted content, sends that content to Claude with structured prompt templates, and generates docs including system maps, data flows, dependency graphs, and per-module class diagrams under `docs/architecture/`. The tool is distributed as an npm package usable via `npx repo-architect` or `bunx repo-architect`.
 
-The system operates in two modes: full analysis for initial documentation generation, and incremental updates that only re-analyze when structural git changes are detected since the last run. This minimizes AI API costs on repos that change frequently. A state file at `docs/architecture/.arch-state.json` tracks the last commit SHA and module inventory to enable this diffing.
+The system operates in two primary modes: a full analysis for initial documentation runs, and an incremental mode that inspects git history to detect only structural changes since the last run, minimizing Claude API costs. A state file at `docs/architecture/.arch-state.json` tracks the last commit SHA and module inventory. Auxiliary features include a local HTTP viewer (`--view`) that serves rendered Mermaid diagrams in a browser, a `--pr` flag that automates a GitHub PR via the `gh` CLI, a `--setup` wizard for GitHub Actions, and a `--dry-run` cost estimator.
 
-The CLI pipeline follows a clean scan → analyze → render → PR pattern. The `scan.ts` module wraps repomix to produce XML-format repo content, `analyze.ts` sends it to Claude with structured prompt templates, `render.ts` generates or patches Markdown files, and `pr.ts` automates branch creation and GitHub PR submission via the `gh` CLI. A local HTTP viewer (`view.ts`) serves an interactive Mermaid-rendered HTML page at port 3333.
+The project also includes a companion marketing website (`site/`) built with React 19, Vite, and TailwindCSS v4, deployed to Cloudflare Workers at repo-architect.com. This site demonstrates the tool with live Mermaid diagram rendering, animated terminals, and feature galleries. The repository also contains a rich `.agents/skills/` library of AI agent skill definitions (Mermaid diagramming, browser automation, Remotion video, React best practices) used for agent-assisted development of the project itself.
 
-The project also includes a marketing homepage (`site/`) built with React 19, Vite, and TailwindCSS v4, hosted on Cloudflare Workers. The `.agents/skills/` directory contains an extensive library of AI agent skill definitions (Mermaid, Remotion, browser automation, React best practices) used for agent-assisted development.
+The TypeScript codebase targets ES2022 ESM, built with Bun, and tested with Vitest. The CLI pipeline follows a clean scan → analyze → render → PR pattern across well-separated modules, each with a single responsibility.
 
 ## Tech Stack
 
@@ -18,7 +18,7 @@ The project also includes a marketing homepage (`site/`) built with React 19, Vi
 - Bun runtime
 - Node.js APIs (fs, http, child_process)
 - Anthropic Claude API (@anthropic-ai/sdk)
-- repomix (repository content extraction)
+- repomix (repository content extraction to XML)
 - Commander.js (CLI argument parsing)
 - chalk + ora (terminal UI)
 - Mermaid (diagram syntax)
@@ -29,33 +29,34 @@ The project also includes a marketing homepage (`site/`) built with React 19, Vi
 - Vite 6
 - TailwindCSS v4
 - lucide-react (icons)
+- mermaid.js (client-side rendering in site and viewer)
 - Cloudflare Workers (homepage hosting via wrangler)
 
 ## System Map
 
 ```mermaid
 graph TD
-    CLI[cli.ts<br/>CLI Entry Point] --> Scanner[scan.ts<br/>Repository Scanner]
-    CLI --> Analyzer[analyze.ts<br/>AI Analysis Engine]
-    CLI --> Renderer[render.ts<br/>Doc Renderer]
-    CLI --> StateM[state.ts<br/>State Manager]
-    CLI --> Diff[diff.ts<br/>Git Diff Tracker]
-    CLI --> PR[pr.ts<br/>PR Creator]
-    CLI --> Setup[setup.ts<br/>GH Action Setup]
-    CLI --> Viewer[view.ts<br/>Local Viewer]
-    CLI --> Config[config.ts<br/>Config Loader]
+    CLI["cli.ts<br/>CLI Entry Point"] --> Scanner["scan.ts<br/>Repo Scanner"]
+    CLI --> Analyzer["analyze.ts<br/>AI Analysis Engine"]
+    CLI --> Renderer["render.ts<br/>Doc Renderer"]
+    CLI --> StateM["state.ts<br/>State Manager"]
+    CLI --> Diff["diff.ts<br/>Git Diff Tracker"]
+    CLI --> PR["pr.ts<br/>PR Creator"]
+    CLI --> Setup["setup.ts<br/>GH Action Setup"]
+    CLI --> Viewer["view.ts<br/>Local Viewer"]
+    CLI --> Config["config.ts<br/>Config Loader"]
 
     Scanner -->|repomix binary| RepoFiles[Repository Files]
     Diff -->|git commands| GitHistory[Git History]
-    Analyzer -->|API| Claude[Claude AI API]
-    Analyzer --> Prompts[prompts/<br/>Prompt Templates]
-    Renderer --> Docs[docs/architecture/<br/>OVERVIEW.md + modules/]
-    StateM --> StateFile[.arch-state.json]
-    PR -->|gh CLI| GitHub[GitHub Pull Request]
-    Viewer -->|HTTP :3333| Browser[Browser Viewer]
+    Analyzer -->|"@anthropic-ai/sdk"| Claude[Claude AI API]
+    Analyzer -->|"prompts/*.md"|" Prompts[Prompt Templates]
+    Renderer --> Docs["docs/architecture/<br/>OVERVIEW.md + modules/"]
+    StateM --> StateFile[".arch-state.json"]
+    PR -->"|gh CLI| GitHub[GitHub Pull Request]
+    Viewer -->|HTTP :3333|" Browser[Browser]
     Viewer --> ViewerTpl[viewer-template.ts]
 
-    Site[site/<br/>React Homepage] -->|Cloudflare Workers| CDN[repo-architect.com]
+    Site["site/<br/>React Homepage"] -->"|Cloudflare Workers| CDN[repo-architect.com]
 ```
 
 ## Data Flows
@@ -123,8 +124,8 @@ graph LR
     Analyze -.->|"@anthropic-ai/sdk"| ExtClaude[Anthropic API]
     Analyze -.->|"prompts/*.md"| ExtPrompts[Prompt Files]
     Scan -.->|repomix| ExtRepomix[repomix binary]
-    PR -.->|"gh + git"| ExtGit[Git / GitHub]
-    CLI -.->|commander| ExtCmd[Commander.js]
+    PR -.->|"gh + git"|" ExtGit[Git / GitHub]
+    CLI -.->"|commander| ExtCmd[Commander.js]
     CLI -.->|chalk,ora| ExtTerm[Terminal UI]
 ```
 
@@ -137,8 +138,10 @@ graph LR
 | [Repository Scanner](modules/repository-scanner.md) | `src/scan.ts` | Wraps the repomix binary to extract repository content into XML format suitable for sending to Claude. Supports both full repository scanning and targeted file scanning for incremental updates. |
 | [Documentation Renderer](modules/documentation-renderer.md) | `src/render.ts` | Generates Markdown files with embedded Mermaid diagrams from analysis results. Handles full documentation generation and incremental patching of existing docs, preserving human-written content while replacing only changed sections. |
 | [State Manager](modules/state-manager.md) | `src/state.ts` | Persists run state to `docs/architecture/.arch-state.json` to enable incremental updates. Tracks the last commit SHA, timestamp, and module inventory so the CLI can detect what changed between runs. |
-| [Git Diff Tracker](modules/git-diff-tracker.md) | `src/diff.ts` | Analyzes git history to identify structural changes since the last documentation run. Classifies file changes as structural (requiring re-analysis) or ignorable (tests, docs, configs) to minimize unnecessary Claude API calls. Also provides architecture history snapshots. |
+| [Git Diff Tracker](modules/git-diff-tracker.md) | `src/diff.ts` | Analyzes git history to identify structural changes since the last documentation run. Classifies file changes as structural (requiring re-analysis) or ignorable (tests, docs, configs) to minimize unnecessary Claude API calls. |
 | [PR Creator](modules/pr-creator.md) | `src/pr.ts` | Automates the GitHub pull request workflow for documentation updates. Creates a timestamped branch, commits changed files, pushes to remote, and opens a PR using the `gh` CLI tool. |
-| [Local Viewer](modules/local-viewer.md) | `src/view.ts + src/viewer-template.ts` | Interactive HTML documentation viewer served on localhost. Loads architecture docs from disk, injects them as JSON into a self-contained HTML template, and serves it with client-side Mermaid rendering, zoom/pan controls, sidebar navigation, and architecture history browsing. |
+| [Local Viewer](modules/local-viewer.md) | `src/view.ts + src/viewer-template.ts` | Interactive HTML documentation viewer served on localhost. Loads architecture docs from disk, injects them as a JSON payload into a self-contained HTML template, and serves it with client-side Mermaid rendering, zoom/pan controls, sidebar navigation, and architecture history browsing. |
 | [Config Loader](modules/config-loader.md) | `src/config.ts` | Loads per-repository configuration from `repo-architect.config.json`, applying defaults for output directory, ignore patterns, include patterns, and AI model selection. |
+| [Prompt Templates](modules/prompt-templates.md) | `prompts/` | External Markdown prompt files for Claude AI that define the analysis instructions and JSON schema requirements. Separate files for full analysis and incremental updates ensure consistent, structured output from the LLM. |
+| [GitHub Action Setup](modules/github-action-setup.md) | `src/setup.ts` | Interactive setup wizard that generates a GitHub Actions workflow file for nightly documentation updates. Prompts for cron schedule and branch name, then creates `.github/workflows/arch-docs.yml`. |
 | [Marketing Site](modules/marketing-site.md) | `site/` | React 19 single-page marketing website for repo-architect.com, built with Vite and TailwindCSS v4. Features a hero with animated terminal, how-it-works section with live Mermaid diagram rendering, gallery, quick-start guide, and dark/light theme toggle. |

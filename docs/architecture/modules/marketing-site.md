@@ -9,10 +9,10 @@ React 19 single-page marketing website for repo-architect.com, built with Vite a
 - App (root component)
 - MermaidDiagram (mermaid.js rendering with zoom/pan)
 - useDiagramZoom (wheel + drag pan/zoom hook)
-- useTheme (cookie-persisted dark/light toggle)
+- useTheme (cookie-persisted dark/light toggle via useSyncExternalStore)
 - Hero, Features, Gallery, HowItWorks, QuickStart, Usage, Footer
-- CodeBlock (copy-to-clipboard tabs)
-- diagrams.ts (diagram source constants)
+- CodeBlock (copy-to-clipboard with tabs)
+- diagrams.ts (diagram source string constants)
 
 ## Internal Structure
 

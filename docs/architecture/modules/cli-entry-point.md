@@ -9,8 +9,8 @@ Main command-line interface built with Commander.js that orchestrates the entire
 - runFull(repoRoot, createPr, model, config)
 - runIncremental(repoRoot, createPr, model, config)
 - runDryRun(repoRoot, model, config)
-- estimateCost(usage, model)
-- formatUsage(usage, model)
+- estimateCost(usage, model): number
+- formatUsage(usage, model): string
 - RepoArchitectConfig
 
 ## Internal Structure
@@ -33,7 +33,7 @@ flowchart TD
     S4 --> S5{--pr?}
     S5 -->|yes| PR[createArchPr]
     Incremental --> I1[getChangedFiles]
-    I1 --> I2{Structural<br/>changes?}
+    I1 --> I2{Structural changes?}
     I2 -->|no| Skip[Exit early]
     I2 -->|yes| I3[scanFiles]
     I3 --> I4[analyzeIncremental]

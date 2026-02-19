@@ -2,18 +2,18 @@
 
 > Path: `src/diff.ts`
 
-Analyzes git history to identify structural changes since the last documentation run. Classifies file changes as structural (requiring re-analysis) or ignorable (tests, docs, configs) to minimize unnecessary Claude API calls. Also provides architecture history snapshots.
+Analyzes git history to identify structural changes since the last documentation run. Classifies file changes as structural (requiring re-analysis) or ignorable (tests, docs, configs) to minimize unnecessary Claude API calls.
 
 ## Key Abstractions
 
 - StructuralChange { file, changeType, isStructural }
 - DiffResult { changes, currentSha, summary }
 - ArchSnapshot { commitSha, date, summary, moduleCount }
-- getChangedFiles(repoRoot, sinceSha)
+- getChangedFiles(repoRoot, sinceSha): Promise<DiffResult>
 - isStructuralFile(filepath): boolean
-- getCurrentSha(repoRoot)
-- getGitLogSummary(repoRoot, sinceSha)
-- getArchHistory(repoRoot, limit, outputDir)
+- getCurrentSha(repoRoot): Promise<string>
+- getGitLogSummary(repoRoot, sinceSha): Promise<string>
+- getArchHistory(repoRoot, limit, outputDir): Promise<ArchSnapshot[]>
 - getSnapshotContent(repoRoot, commitSha, outputDir)
 
 ## Internal Structure

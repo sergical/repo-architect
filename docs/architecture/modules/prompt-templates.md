@@ -2,15 +2,14 @@
 
 > Path: `prompts/`
 
-External prompt templates for Claude AI that define the analysis instructions. Separate files for full analysis and incremental updates ensure consistent, structured output from the LLM.
+External Markdown prompt files for Claude AI that define the analysis instructions and JSON schema requirements. Separate files for full analysis and incremental updates ensure consistent, structured output from the LLM.
 
 ## Key Abstractions
 
-- analyze-full.md - Initial repository analysis prompt
+- analyze-full.md - Initial repository analysis prompt with JSON schema
 - analyze-incremental.md - Delta update analysis prompt
-- templates/overview.md - Documentation template
-- templates/module.md - Module documentation template
-- JSON schema enforcement via prompts
+- templates/overview.md - OVERVIEW.md Markdown template
+- templates/module.md - Per-module Markdown template
 
 ## Internal Structure
 
@@ -24,7 +23,6 @@ graph TD
     Schema1 --> Claude[Claude API]
     Schema2 --> Claude
     Claude --> Response[Structured JSON response]
-    
     Renderer[render.ts] --> TplOverview[templates/overview.md]
     Renderer --> TplModule[templates/module.md]
     TplOverview --> Markdown[Generated docs]

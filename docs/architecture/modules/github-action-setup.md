@@ -2,7 +2,7 @@
 
 > Path: `src/setup.ts`
 
-Interactive setup wizard that generates a GitHub Actions workflow file for nightly documentation updates. Prompts for configuration and creates .github/workflows/arch-docs.yml with proper permissions and secrets.
+Interactive setup wizard that generates a GitHub Actions workflow file for nightly documentation updates. Prompts for cron schedule and branch name, then creates `.github/workflows/arch-docs.yml`.
 
 ## Key Abstractions
 
@@ -21,5 +21,4 @@ flowchart TD
     Generate --> Write[Write .github/workflows/arch-docs.yml]
     Write --> Instructions[Show setup instructions]
     Instructions --> Secrets[Remind: Add ANTHROPIC_API_KEY secret]
-    Secrets --> End[Complete]
 ```

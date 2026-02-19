@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { MermaidDiagram } from './MermaidDiagram';
 import { galleryOverview, galleryModule, galleryFlows } from './diagrams';
 
@@ -7,6 +8,8 @@ const TABS = [
   { label: 'Module Detail', key: 'module', source: galleryModule },
   { label: 'Data Flows', key: 'flows', source: galleryFlows },
 ];
+
+const springTransition = { type: 'spring' as const, stiffness: 500, damping: 30 };
 
 export function Gallery() {
   const [activeTab, setActiveTab] = useState(0);
@@ -37,7 +40,7 @@ export function Gallery() {
           className="flex justify-center gap-1 mb-6 bg-surface rounded-full p-1 w-fit mx-auto"
         >
           {TABS.map((tab, i) => (
-            <button
+            <motion.button
               key={tab.key}
               ref={(el) => { tabsRef.current[i] = el; }}
               role="tab"
@@ -45,26 +48,38 @@ export function Gallery() {
               tabIndex={i === activeTab ? 0 : -1}
               onClick={() => setActiveTab(i)}
               onKeyDown={(e) => handleKeyDown(e, i)}
-              className={`py-2 px-5 rounded-full cursor-pointer text-[0.9rem] font-sans transition-colors ${
-                i === activeTab
-                  ? 'bg-bg border border-accent text-accent'
-                  : 'text-muted'
-              }`}
+              whileTap={{ scale: 0.97 }}
+              className="relative py-2 px-5 rounded-full cursor-pointer text-[0.9rem] font-sans transition-colors hover:bg-surface/50"
+              style={{ color: i === activeTab ? undefined : 'var(--color-muted)' }}
             >
-              {tab.label}
-            </button>
+              {i === activeTab && (
+                <motion.div
+                  layoutId="gallery-tab-indicator"
+                  className="absolute inset-0 rounded-full bg-bg border border-accent"
+                  transition={springTransition}
+                />
+              )}
+              <span className="relative z-[1]" style={i === activeTab ? { color: 'var(--color-accent)' } : undefined}>
+                {tab.label}
+              </span>
+            </motion.button>
           ))}
         </div>
 
         {/* Panels */}
         <div className="max-w-[900px] mx-auto">
-          {TABS.map((tab, i) => (
-            <div key={tab.key} role="tabpanel" hidden={i !== activeTab}>
-              {i === activeTab && (
-                <MermaidDiagram source={tab.source} id={`gallery-${tab.key}`} />
-              )}
-            </div>
-          ))}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={TABS[activeTab].key}
+              role="tabpanel"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2, ease: 'easeInOut' }}
+            >
+              <MermaidDiagram source={TABS[activeTab].source} id={`gallery-${TABS[activeTab].key}`} />
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
     </section>

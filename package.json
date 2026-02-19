@@ -1,6 +1,6 @@
 {
   "name": "repo-architect",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Your codebase, documented. Automatically. Every night.",
   "type": "module",
   "bin": {
@@ -19,7 +19,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prepublishOnly": "npm run build && npm test",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "bun run build && bun test",
     "site:dev": "cd site && bun run dev",
     "site:build": "cd site && bun run build",
     "site:preview": "cd site && bun run preview"
@@ -33,8 +34,17 @@
     "claude"
   ],
   "license": "MIT",
+  "homepage": "https://repo-architect.pages.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sergical/repo-architect"
+  },
+  "bugs": {
+    "url": "https://github.com/sergical/repo-architect/issues"
+  },
+  "author": "Sergiy Dybskiy",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
+    "@anthropic-ai/sdk": "^0.41.0",
     "chalk": "^5.4.1",
     "commander": "^13.1.0",
     "ora": "^8.2.0",

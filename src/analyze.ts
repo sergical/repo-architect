@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+export const DEFAULT_MODEL = 'claude-sonnet-4-5-20250514';
+
 export interface ModuleAnalysis {
   name: string;
   path: string;
@@ -65,21 +67,26 @@ async function loadPrompt(name: string): Promise<string> {
   return readFile(promptPath, 'utf-8');
 }
 
-export async function analyzeFullRepo(repoContent: string): Promise<AnalysisResult> {
-  const client = new Anthropic({ apiKey: await getApiKey() });
+export async function analyzeFullRepo(repoContent: string, model?: string): Promise<AnalysisResult> {
+  const client = new Anthropic({ apiKey: await getApiKey(), maxRetries: 3 });
   const systemPrompt = await loadPrompt('analyze-full');
 
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-5-20250929',
-    max_tokens: 16000,
-    system: systemPrompt,
-    messages: [
-      {
-        role: 'user',
-        content: `Analyze this repository and generate architecture documentation.\n\n${repoContent}`,
-      },
-    ],
-  });
+  let response: Anthropic.Message;
+  try {
+    response = await client.messages.create({
+      model: model ?? DEFAULT_MODEL,
+      max_tokens: 16000,
+      system: systemPrompt,
+      messages: [
+        {
+          role: 'user',
+          content: `Analyze this repository and generate architecture documentation.\n\n${repoContent}`,
+        },
+      ],
+    });
+  } catch (err) {
+    throw wrapApiError(err);
+  }
 
   const text = response.content
     .filter((block): block is Anthropic.TextBlock => block.type === 'text')
@@ -94,33 +101,39 @@ export async function analyzeIncremental(
   existingDocs: string,
   changeSummary: string,
   gitLog: string,
+  model?: string,
 ): Promise<IncrementalAnalysisResult> {
-  const client = new Anthropic({ apiKey: await getApiKey() });
+  const client = new Anthropic({ apiKey: await getApiKey(), maxRetries: 3 });
   const systemPrompt = await loadPrompt('analyze-incremental');
 
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-5-20250929',
-    max_tokens: 16000,
-    system: systemPrompt,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          '## Changes Since Last Run',
-          changeSummary,
-          '',
-          '## Git Log',
-          gitLog,
-          '',
-          '## Existing Architecture Docs',
-          existingDocs,
-          '',
-          '## Current Repository Content',
-          repoContent,
-        ].join('\n'),
-      },
-    ],
-  });
+  let response: Anthropic.Message;
+  try {
+    response = await client.messages.create({
+      model: model ?? DEFAULT_MODEL,
+      max_tokens: 16000,
+      system: systemPrompt,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            '## Changes Since Last Run',
+            changeSummary,
+            '',
+            '## Git Log',
+            gitLog,
+            '',
+            '## Existing Architecture Docs',
+            existingDocs,
+            '',
+            '## Current Repository Content',
+            repoContent,
+          ].join('\n'),
+        },
+      ],
+    });
+  } catch (err) {
+    throw wrapApiError(err);
+  }
 
   const text = response.content
     .filter((block): block is Anthropic.TextBlock => block.type === 'text')
@@ -130,34 +143,84 @@ export async function analyzeIncremental(
   return parseIncrementalResponse(text);
 }
 
-function parseAnalysisResponse(text: string): AnalysisResult {
+function wrapApiError(err: unknown): Error {
+  if (err instanceof Anthropic.APIError) {
+    if (err.status === 401) {
+      return new Error(
+        'Invalid API key. Check your ANTHROPIC_API_KEY or ~/.repo-architect file.\n' +
+        'Get a key at https://console.anthropic.com/settings/keys'
+      );
+    }
+    if (err.status === 429) {
+      return new Error(
+        'Rate limited by the Anthropic API. Wait a minute and try again, or check your plan limits at https://console.anthropic.com'
+      );
+    }
+    return new Error(`Anthropic API error (${err.status}): ${err.message}`);
+  }
+  return err instanceof Error ? err : new Error(String(err));
+}
+
+const VALID_MERMAID_TYPES = /^(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie|gitGraph|journey|mindmap|timeline|quadrantChart|sankey|xychart|block)/;
+
+export function validateMermaid(diagram: string): string {
+  const trimmed = diagram.trim();
+  if (!trimmed) return '';
+
+  if (VALID_MERMAID_TYPES.test(trimmed)) return trimmed;
+
+  // Heuristic: has arrows but no declaration — prepend graph TD
+  if (trimmed.includes('-->') || trimmed.includes('---')) {
+    console.warn('  Warning: Mermaid diagram missing type declaration, prepending "graph TD"');
+    return `graph TD\n${trimmed}`;
+  }
+
+  console.warn('  Warning: Invalid mermaid diagram content, skipping');
+  return '';
+}
+
+export function parseAnalysisResponse(text: string): AnalysisResult {
   const json = extractJson(text);
   if (json) {
-    return json as AnalysisResult;
+    const result = json as AnalysisResult;
+    result.systemMap = validateMermaid(result.systemMap);
+    result.dataFlows = validateMermaid(result.dataFlows);
+    result.dependencyGraph = validateMermaid(result.dependencyGraph);
+    for (const mod of result.modules) {
+      mod.internalDiagram = validateMermaid(mod.internalDiagram);
+    }
+    return result;
   }
 
   return {
     projectName: extractSection(text, 'PROJECT_NAME') || 'Unknown Project',
     overview: extractSection(text, 'OVERVIEW') || text,
     techStack: extractList(text, 'TECH_STACK'),
-    systemMap: extractSection(text, 'SYSTEM_MAP') || '',
-    dataFlows: extractSection(text, 'DATA_FLOWS') || '',
-    dependencyGraph: extractSection(text, 'DEPENDENCY_GRAPH') || '',
+    systemMap: validateMermaid(extractSection(text, 'SYSTEM_MAP') || ''),
+    dataFlows: validateMermaid(extractSection(text, 'DATA_FLOWS') || ''),
+    dependencyGraph: validateMermaid(extractSection(text, 'DEPENDENCY_GRAPH') || ''),
     modules: extractModules(text),
   };
 }
 
-function parseIncrementalResponse(text: string): IncrementalAnalysisResult {
+export function parseIncrementalResponse(text: string): IncrementalAnalysisResult {
   const json = extractJson(text);
   if (json) {
-    return json as IncrementalAnalysisResult;
+    const result = json as IncrementalAnalysisResult;
+    if (result.updatedSystemMap) result.updatedSystemMap = validateMermaid(result.updatedSystemMap);
+    if (result.updatedDataFlows) result.updatedDataFlows = validateMermaid(result.updatedDataFlows);
+    if (result.updatedDependencyGraph) result.updatedDependencyGraph = validateMermaid(result.updatedDependencyGraph);
+    for (const mod of [...(result.updatedModules || []), ...(result.newModules || [])]) {
+      mod.internalDiagram = validateMermaid(mod.internalDiagram);
+    }
+    return result;
   }
 
   return {
     updatedOverview: extractSection(text, 'UPDATED_OVERVIEW'),
-    updatedSystemMap: extractSection(text, 'UPDATED_SYSTEM_MAP'),
-    updatedDataFlows: extractSection(text, 'UPDATED_DATA_FLOWS'),
-    updatedDependencyGraph: extractSection(text, 'UPDATED_DEPENDENCY_GRAPH'),
+    updatedSystemMap: validateMermaid(extractSection(text, 'UPDATED_SYSTEM_MAP') || '') || null,
+    updatedDataFlows: validateMermaid(extractSection(text, 'UPDATED_DATA_FLOWS') || '') || null,
+    updatedDependencyGraph: validateMermaid(extractSection(text, 'UPDATED_DEPENDENCY_GRAPH') || '') || null,
     updatedModules: extractModules(text),
     newModules: [],
     deletedModules: [],

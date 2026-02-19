@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { scanRepo, scanFiles } from './scan.js';
-import { analyzeFullRepo, analyzeIncremental } from './analyze.js';
+import { analyzeFullRepo, analyzeIncremental, DEFAULT_MODEL } from './analyze.js';
 import { renderFullDocs, renderIncrementalDocs } from './render.js';
 import { readState, writeState } from './state.js';
 import { getChangedFiles, getCurrentSha, getGitLogSummary } from './diff.js';
@@ -23,7 +23,8 @@ async function getVersion(): Promise<string> {
   return pkg.version;
 }
 
-async function runFull(repoRoot: string, createPr: boolean): Promise<void> {
+async function runFull(repoRoot: string, createPr: boolean, model?: string): Promise<void> {
+  const startTime = Date.now();
   console.log(chalk.bold('\n  repo-architect') + chalk.dim(' - documenting your codebase\n'));
 
   const spinner = ora({ indent: 2 });
@@ -35,7 +36,7 @@ async function runFull(repoRoot: string, createPr: boolean): Promise<void> {
 
   // Step 2: Analyze
   spinner.start('Analyzing architecture with Claude...');
-  const analysis = await analyzeFullRepo(scanResult.content);
+  const analysis = await analyzeFullRepo(scanResult.content, model);
   spinner.succeed(`Identified ${analysis.modules.length} modules`);
 
   // Step 3: Render
@@ -78,10 +79,12 @@ async function runFull(repoRoot: string, createPr: boolean): Promise<void> {
     }
   }
 
-  console.log(chalk.bold.green('\n  Done!') + chalk.dim(` Docs at ${path.relative(repoRoot, path.join(repoRoot, 'docs/architecture'))}/\n`));
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  console.log(chalk.bold.green('\n  Done!') + chalk.dim(` (${elapsed}s) Docs at ${path.relative(repoRoot, path.join(repoRoot, 'docs/architecture'))}/\n`));
 }
 
-async function runIncremental(repoRoot: string, createPr: boolean): Promise<void> {
+async function runIncremental(repoRoot: string, createPr: boolean, model?: string): Promise<void> {
+  const startTime = Date.now();
   console.log(chalk.bold('\n  repo-architect') + chalk.dim(' - incremental update\n'));
 
   const spinner = ora({ indent: 2 });
@@ -90,7 +93,7 @@ async function runIncremental(repoRoot: string, createPr: boolean): Promise<void
   const state = await readState(repoRoot);
   if (!state) {
     console.log(chalk.yellow('  No previous run found. Running full scan instead.\n'));
-    return runFull(repoRoot, createPr);
+    return runFull(repoRoot, createPr, model);
   }
 
   // Step 1: Check diff
@@ -125,12 +128,12 @@ async function runIncremental(repoRoot: string, createPr: boolean): Promise<void
 
   // Step 5: Analyze
   spinner.start('Analyzing changes with Claude...');
-  const analysis = await analyzeIncremental(scanResult.content, existingDocs, diff.summary, gitLog);
+  const analysis = await analyzeIncremental(scanResult.content, existingDocs, diff.summary, gitLog, model);
   spinner.succeed('Analysis complete');
 
   // Step 6: Render
   spinner.start('Updating documentation...');
-  const writtenFiles = await renderIncrementalDocs(repoRoot, analysis);
+  const { writtenFiles, deletedFiles } = await renderIncrementalDocs(repoRoot, analysis);
   spinner.succeed(`Updated ${writtenFiles.length} files`);
 
   // Step 7: Save state
@@ -149,6 +152,10 @@ async function runIncremental(repoRoot: string, createPr: boolean): Promise<void
   for (const f of writtenFiles) {
     const rel = path.relative(repoRoot, f);
     console.log(chalk.green(`    ~ ${rel}`));
+  }
+  for (const f of deletedFiles) {
+    const rel = path.relative(repoRoot, f);
+    console.log(chalk.red(`    - ${rel}`));
   }
 
   // PR
@@ -170,7 +177,25 @@ async function runIncremental(repoRoot: string, createPr: boolean): Promise<void
     }
   }
 
-  console.log(chalk.bold.green('\n  Done!\n'));
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  console.log(chalk.bold.green('\n  Done!') + chalk.dim(` (${elapsed}s)\n`));
+}
+
+async function runDryRun(repoRoot: string): Promise<void> {
+  console.log(chalk.bold('\n  repo-architect') + chalk.dim(' - dry run\n'));
+
+  const spinner = ora({ indent: 2 });
+
+  spinner.start('Scanning repository with Repomix...');
+  const scanResult = await scanRepo(repoRoot);
+  spinner.succeed(`Scanned ${scanResult.fileCount} files`);
+
+  // Rough token estimate: ~4 chars per token for code
+  const estimatedTokens = Math.round(scanResult.content.length / 4);
+  console.log(chalk.dim(`\n  File count:       `) + chalk.bold(String(scanResult.fileCount)));
+  console.log(chalk.dim(`  Content size:     `) + chalk.bold(`${(scanResult.content.length / 1024).toFixed(0)} KB`));
+  console.log(chalk.dim(`  Estimated tokens: `) + chalk.bold(`~${estimatedTokens.toLocaleString()}`));
+  console.log(chalk.dim('\n  Dry run complete — no API call made.\n'));
 }
 
 async function main(): Promise<void> {
@@ -187,6 +212,9 @@ async function main(): Promise<void> {
     .option('--pr', 'Create a pull request with changes')
     .option('--setup', 'Set up GitHub Action for nightly runs')
     .option('--view', 'Open local architecture viewer in browser')
+    .option('--port <number>', 'Port for the architecture viewer', parseInt)
+    .option('--model <model>', `Claude model to use (default: ${DEFAULT_MODEL})`)
+    .option('--dry-run', 'Scan only — print file count and estimated tokens, skip API call')
     .option('-d, --dir <path>', 'Repository root directory', process.cwd())
     .action(async (opts) => {
       const repoRoot = path.resolve(opts.dir);
@@ -197,14 +225,19 @@ async function main(): Promise<void> {
       }
 
       if (opts.view) {
-        await startViewer(repoRoot);
+        await startViewer(repoRoot, opts.port);
+        return;
+      }
+
+      if (opts.dryRun) {
+        await runDryRun(repoRoot);
         return;
       }
 
       if (opts.incremental) {
-        await runIncremental(repoRoot, opts.pr ?? false);
+        await runIncremental(repoRoot, opts.pr ?? false, opts.model);
       } else {
-        await runFull(repoRoot, opts.pr ?? false);
+        await runFull(repoRoot, opts.pr ?? false, opts.model);
       }
     });
 

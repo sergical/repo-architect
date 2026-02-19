@@ -9,6 +9,7 @@ export interface ViewerData {
   overview: string;
   modules: ViewerModule[];
   lastRunAt: string | null;
+  history: { commitSha: string; date: string; summary: string; moduleCount: number }[];
 }
 
 /**
@@ -198,6 +199,87 @@ export function getViewerHtml(data: ViewerData): string {
   .empty-state p { color: var(--muted); opacity: 0.6; }
   .empty-state code { font-size: 1em; }
 
+  /* Search */
+  .search-wrap {
+    position: relative; margin-bottom: 16px;
+  }
+  .search-input {
+    width: 100%; padding: 8px 12px; padding-right: 36px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); font-size: 13px; font-family: inherit;
+    outline: none; transition: border-color 0.15s;
+  }
+  .search-input::placeholder { color: var(--muted); opacity: 0.5; }
+  .search-input:focus { border-color: var(--accent); }
+  .search-hint {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
+    padding: 1px 6px; font-size: 11px; color: var(--muted); pointer-events: none;
+    font-family: 'Geist Mono', monospace;
+  }
+  .search-input:focus + .search-hint { display: none; }
+  .no-results {
+    padding: 12px; font-size: 13px; color: var(--muted); opacity: 0.6; text-align: center;
+  }
+
+  /* Breadcrumb */
+  .breadcrumb {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 16px; font-size: 13px; color: var(--muted);
+  }
+  .breadcrumb a {
+    color: var(--accent); text-decoration: none; cursor: pointer;
+  }
+  .breadcrumb a:hover { text-decoration: underline; }
+  .breadcrumb-sep { color: var(--border); }
+  .breadcrumb-current { color: var(--text); font-weight: 500; }
+
+  /* History section */
+  .history-section {
+    border-top: 1px solid var(--border); margin-top: 12px; padding-top: 4px;
+  }
+  .history-toggle {
+    display: flex; align-items: center; gap: 6px; cursor: pointer;
+    font-size: 11px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    padding: 8px 12px 4px; opacity: 0.6; background: none; border: none;
+    width: 100%; text-align: left; font-family: inherit;
+  }
+  .history-toggle:hover { opacity: 1; }
+  .history-toggle .arrow { transition: transform 0.15s; font-size: 10px; }
+  .history-toggle.expanded .arrow { transform: rotate(90deg); }
+  .history-list { display: none; }
+  .history-list.visible { display: block; }
+  .history-item {
+    display: block; padding: 6px 12px; margin-bottom: 1px;
+    border-radius: 6px; cursor: pointer; font-size: 12px;
+    color: var(--muted); text-decoration: none; transition: all 0.15s;
+    line-height: 1.4;
+  }
+  .history-item:hover { background: var(--hover-bg); color: var(--text); }
+  .history-item.active { background: var(--active-bg); color: var(--accent); }
+  .history-date { font-size: 11px; opacity: 0.7; }
+  .history-summary {
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    display: block; max-width: 210px;
+  }
+  .history-modules { font-size: 10px; opacity: 0.5; }
+
+  /* Snapshot banner */
+  .snapshot-banner {
+    background: #78350f; color: #fef3c7; padding: 10px 16px;
+    border-radius: 8px; margin-bottom: 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 13px;
+  }
+  :root[data-theme="light"] .snapshot-banner {
+    background: #fef3c7; color: #78350f;
+  }
+  .snapshot-banner a {
+    color: inherit; text-decoration: underline; cursor: pointer;
+    font-weight: 600;
+  }
+
   /* Responsive */
   @media (max-width: 768px) {
     .sidebar { transform: translateX(-100%); transition: transform 0.2s; }
@@ -216,6 +298,10 @@ export function getViewerHtml(data: ViewerData): string {
     <div class="sidebar-brand"><span>repo</span>-architect</div>
     <button class="theme-toggle" id="theme-toggle" title="Toggle theme">&#9788;</button>
   </div>
+  <div class="search-wrap">
+    <input type="text" class="search-input" id="search" placeholder="Search modules..." autocomplete="off">
+    <span class="search-hint">/</span>
+  </div>
   <div id="nav"></div>
   <div class="sidebar-footer" id="footer"></div>
 </nav>
@@ -227,10 +313,13 @@ export function getViewerHtml(data: ViewerData): string {
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>
 // Local-only viewer: all data comes from the user's own docs/architecture/ files.
-// Safe innerHTML usage: renders trusted local markdown via marked.js and
-// mermaid SVG output — both sourced exclusively from user's own filesystem.
+// Safe usage of innerHTML/setHTMLUnsafe: renders trusted local markdown via marked.js
+// and mermaid SVG output — both sourced exclusively from user's own filesystem.
 (function() {
   var data = window.__ARCH_DATA__;
+
+  // Helper: set trusted HTML content (local-only data from user's filesystem)
+  function setTrustedHtml(el, html) { el.innerHTML = html; }
 
   // Theme toggle
   var themeBtn = document.getElementById('theme-toggle');
@@ -425,19 +514,114 @@ export function getViewerHtml(data: ViewerData): string {
   var nav = document.getElementById('nav');
   var content = document.getElementById('content');
   var footer = document.getElementById('footer');
+  var searchInput = document.getElementById('search');
+
+  // Snapshot state
+  var snapshotData = null;
+  var snapshotSha = null;
+  var snapshotCache = {};
 
   document.getElementById('sidebar-toggle').addEventListener('click', function() {
     document.getElementById('sidebar').classList.toggle('open');
   });
 
+  // --- Hash routing ---
+  function targetFromHash() {
+    var h = window.location.hash.replace('#', '');
+    if (!h || h === 'overview') return 'overview';
+    if (h.startsWith('history/')) return h;
+    var found = data.modules.find(function(m) { return m.slug === h; });
+    return found ? h : 'overview';
+  }
+
+  function navigateTo(target) {
+    var hash = target === 'overview' ? '#overview' : '#' + target;
+    if (window.location.hash !== hash) {
+      window.location.hash = hash;
+    } else {
+      onHashChange();
+    }
+  }
+
+  async function onHashChange() {
+    currentTarget = targetFromHash();
+
+    if (currentTarget.startsWith('history/')) {
+      var sha = currentTarget.replace('history/', '');
+      await loadSnapshot(sha);
+    } else {
+      snapshotData = null;
+      snapshotSha = null;
+    }
+
+    updateActiveNav();
+    showContent(currentTarget);
+    document.getElementById('sidebar').classList.remove('open');
+  }
+
+  window.addEventListener('hashchange', onHashChange);
+
+  async function loadSnapshot(sha) {
+    if (snapshotCache[sha]) {
+      snapshotData = snapshotCache[sha];
+      snapshotSha = sha;
+      return;
+    }
+    try {
+      var resp = await fetch('/api/snapshot?sha=' + encodeURIComponent(sha));
+      if (resp.ok) {
+        snapshotData = await resp.json();
+        snapshotCache[sha] = snapshotData;
+        snapshotSha = sha;
+      }
+    } catch (e) {
+      snapshotData = null;
+      snapshotSha = null;
+    }
+  }
+
+  // --- Search / filter ---
+  function getVisibleNavItems() {
+    return Array.from(nav.querySelectorAll('.nav-item.module-item')).filter(function(el) {
+      return el.style.display !== 'none';
+    });
+  }
+
+  function applyFilter() {
+    var query = searchInput.value.toLowerCase().trim();
+    var moduleItems = nav.querySelectorAll('.nav-item.module-item');
+    var anyVisible = false;
+    moduleItems.forEach(function(el) {
+      var name = el.textContent.toLowerCase();
+      var show = !query || name.includes(query);
+      el.style.display = show ? '' : 'none';
+      if (show) anyVisible = true;
+    });
+
+    var noResults = nav.querySelector('.no-results');
+    if (query && !anyVisible) {
+      if (!noResults) {
+        noResults = document.createElement('div');
+        noResults.className = 'no-results';
+        noResults.textContent = 'No modules found';
+        nav.appendChild(noResults);
+      }
+    } else if (noResults) {
+      noResults.remove();
+    }
+  }
+
+  searchInput.addEventListener('input', applyFilter);
+
+  // --- Build nav ---
   function buildNav() {
     var el = document.createElement('div');
 
     var overviewLink = document.createElement('a');
-    overviewLink.className = 'nav-item overview active';
+    overviewLink.className = 'nav-item overview';
     overviewLink.dataset.target = 'overview';
     overviewLink.textContent = 'Overview';
-    overviewLink.addEventListener('click', onNavClick);
+    overviewLink.addEventListener('click', function() { navigateTo('overview'); });
     el.appendChild(overviewLink);
 
     if (data.modules.length > 0) {
@@ -448,32 +632,99 @@ export function getViewerHtml(data: ViewerData): string {
 
       data.modules.forEach(function(m) {
         var link = document.createElement('a');
-        link.className = 'nav-item';
+        link.className = 'nav-item module-item';
         link.dataset.target = m.slug;
         link.textContent = m.name;
-        link.addEventListener('click', onNavClick);
+        link.addEventListener('click', function() { navigateTo(m.slug); });
         el.appendChild(link);
       });
+    }
+
+    // History section
+    if (data.history && data.history.length > 0) {
+      var histSection = document.createElement('div');
+      histSection.className = 'history-section';
+
+      var toggleBtn = document.createElement('button');
+      toggleBtn.className = 'history-toggle';
+      var arrowSpan = document.createElement('span');
+      arrowSpan.className = 'arrow';
+      arrowSpan.textContent = '\\u25B6';
+      toggleBtn.appendChild(arrowSpan);
+      toggleBtn.appendChild(document.createTextNode(' History (' + data.history.length + ')'));
+
+      var histList = document.createElement('div');
+      histList.className = 'history-list';
+
+      toggleBtn.addEventListener('click', function() {
+        toggleBtn.classList.toggle('expanded');
+        histList.classList.toggle('visible');
+      });
+
+      data.history.forEach(function(snap, i) {
+        var item = document.createElement('a');
+        item.className = 'history-item';
+        item.dataset.target = 'history/' + snap.commitSha;
+
+        var dateStr = new Date(snap.date).toLocaleDateString(undefined, {
+          month: 'short', day: 'numeric', year: 'numeric'
+        });
+
+        var dateSpan = document.createElement('span');
+        dateSpan.className = 'history-date';
+        dateSpan.textContent = dateStr;
+        if (i === 0) dateSpan.textContent += ' (latest)';
+
+        var summarySpan = document.createElement('span');
+        summarySpan.className = 'history-summary';
+        summarySpan.textContent = snap.summary;
+        summarySpan.title = snap.summary;
+
+        var modulesSpan = document.createElement('span');
+        modulesSpan.className = 'history-modules';
+        modulesSpan.textContent = snap.moduleCount + ' module' + (snap.moduleCount !== 1 ? 's' : '');
+
+        item.appendChild(dateSpan);
+        item.appendChild(summarySpan);
+        item.appendChild(modulesSpan);
+
+        item.addEventListener('click', function() {
+          navigateTo('history/' + snap.commitSha);
+        });
+        histList.appendChild(item);
+      });
+
+      histSection.appendChild(toggleBtn);
+      histSection.appendChild(histList);
+      el.appendChild(histSection);
     }
 
     nav.appendChild(el);
   }
 
-  function onNavClick(e) {
-    nav.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
-    e.currentTarget.classList.add('active');
-    currentTarget = e.currentTarget.dataset.target;
-    showContent(currentTarget);
-    document.getElementById('sidebar').classList.remove('open');
+  function updateActiveNav() {
+    nav.querySelectorAll('.nav-item').forEach(function(n) {
+      n.classList.toggle('active', n.dataset.target === currentTarget);
+    });
+    nav.querySelectorAll('.history-item').forEach(function(n) {
+      n.classList.toggle('active', n.dataset.target === currentTarget);
+    });
   }
+
+  function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
   function showContent(target) {
     var md = '';
-    if (target === 'overview') {
+    var moduleName = '';
+    var isSnapshot = target.startsWith('history/');
+
+    if (isSnapshot && snapshotData) {
+      md = snapshotData.overview;
+    } else if (target === 'overview') {
       md = data.overview;
     } else {
       var mod = data.modules.find(function(m) { return m.slug === target; });
-      if (mod) md = mod.content;
+      if (mod) { md = mod.content; moduleName = mod.name; }
     }
 
     if (!md) {
@@ -481,29 +732,169 @@ export function getViewerHtml(data: ViewerData): string {
       var emptyDiv = document.createElement('div');
       emptyDiv.className = 'empty-state';
       var h2 = document.createElement('h2');
-      h2.textContent = 'No docs yet';
+      h2.textContent = isSnapshot ? 'Snapshot not found' : 'No docs yet';
       var p = document.createElement('p');
-      p.textContent = 'Run repo-architect first to generate architecture documentation.';
+      p.textContent = isSnapshot
+        ? 'Could not load this snapshot from git history.'
+        : 'Run repo-architect first to generate architecture documentation.';
       emptyDiv.appendChild(h2);
       emptyDiv.appendChild(p);
       content.appendChild(emptyDiv);
       return;
     }
 
-    // Safe: rendering trusted local markdown content via marked.js
+    // Trusted local markdown content via marked.js
     // Data sourced exclusively from user's own docs/architecture/ files
-    content.innerHTML = renderMarkdown(md);
+    var htmlStr = renderMarkdown(md);
+
+    content.textContent = '';
+
+    // Snapshot banner
+    if (isSnapshot && snapshotSha) {
+      var snapInfo = data.history.find(function(h) { return h.commitSha === snapshotSha; });
+      var banner = document.createElement('div');
+      banner.className = 'snapshot-banner';
+      var bannerText = document.createElement('span');
+      var dateLabel = snapInfo ? new Date(snapInfo.date).toLocaleDateString(undefined, {
+        month: 'short', day: 'numeric', year: 'numeric'
+      }) : snapshotSha.substring(0, 7);
+      bannerText.textContent = 'Viewing snapshot from ' + dateLabel;
+      var backLink = document.createElement('a');
+      backLink.textContent = 'Back to current';
+      backLink.addEventListener('click', function() { navigateTo('overview'); });
+      banner.appendChild(bannerText);
+      banner.appendChild(backLink);
+      content.appendChild(banner);
+
+      // Module nav for snapshot
+      if (snapshotData && snapshotData.modules && snapshotData.modules.length > 0) {
+        var snapNav = document.createElement('div');
+        snapNav.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;';
+        snapshotData.modules.forEach(function(m) {
+          var btn = document.createElement('button');
+          btn.textContent = m.name;
+          btn.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:4px 10px;color:var(--muted);font-size:12px;cursor:pointer;font-family:inherit;';
+          btn.addEventListener('click', function() {
+            showSnapshotModule(m);
+          });
+          snapNav.appendChild(btn);
+        });
+        content.appendChild(snapNav);
+      }
+    }
+
+    // Breadcrumb for module pages (non-snapshot)
+    if (!isSnapshot && target !== 'overview' && moduleName) {
+      var bcDiv = document.createElement('div');
+      bcDiv.className = 'breadcrumb';
+      var bcLink = document.createElement('a');
+      bcLink.textContent = 'Overview';
+      bcLink.addEventListener('click', function() { navigateTo('overview'); });
+      var bcSep = document.createElement('span');
+      bcSep.className = 'breadcrumb-sep';
+      bcSep.textContent = '/';
+      var bcCurrent = document.createElement('span');
+      bcCurrent.className = 'breadcrumb-current';
+      bcCurrent.textContent = moduleName;
+      bcDiv.appendChild(bcLink);
+      bcDiv.appendChild(bcSep);
+      bcDiv.appendChild(bcCurrent);
+      content.appendChild(bcDiv);
+    }
+
+    var bodyDiv = document.createElement('div');
+    setTrustedHtml(bodyDiv, htmlStr);
+    content.appendChild(bodyDiv);
     window.scrollTo(0, 0);
 
     renderMermaidDiagrams();
   }
+
+  function showSnapshotModule(mod) {
+    content.textContent = '';
+
+    var snapInfo = data.history.find(function(h) { return h.commitSha === snapshotSha; });
+    var banner = document.createElement('div');
+    banner.className = 'snapshot-banner';
+    var bannerText = document.createElement('span');
+    var dateLabel = snapInfo ? new Date(snapInfo.date).toLocaleDateString(undefined, {
+      month: 'short', day: 'numeric', year: 'numeric'
+    }) : snapshotSha.substring(0, 7);
+    bannerText.textContent = 'Viewing snapshot from ' + dateLabel + ' / ' + mod.name;
+    var backLink = document.createElement('a');
+    backLink.textContent = 'Back to snapshot overview';
+    backLink.addEventListener('click', function() {
+      showContent('history/' + snapshotSha);
+    });
+    banner.appendChild(bannerText);
+    banner.appendChild(backLink);
+    content.appendChild(banner);
+
+    var htmlStr = renderMarkdown(mod.content);
+    var bodyDiv = document.createElement('div');
+    setTrustedHtml(bodyDiv, htmlStr);
+    content.appendChild(bodyDiv);
+    window.scrollTo(0, 0);
+    renderMermaidDiagrams();
+  }
+
+  // --- Keyboard navigation ---
+  document.addEventListener('keydown', function(e) {
+    var tag = (e.target || e.srcElement).tagName;
+    var isInput = tag === 'INPUT' || tag === 'TEXTAREA';
+
+    if (e.key === '/' && !isInput) {
+      e.preventDefault();
+      searchInput.focus();
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      searchInput.value = '';
+      applyFilter();
+      searchInput.blur();
+      return;
+    }
+
+    if (isInput) return;
+
+    if (e.key === 'j' || e.key === 'ArrowDown' || e.key === 'k' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      var allItems = [nav.querySelector('.nav-item.overview')].concat(getVisibleNavItems());
+      allItems = allItems.filter(Boolean);
+      var curIdx = allItems.findIndex(function(el) { return el.dataset.target === currentTarget; });
+      if (e.key === 'j' || e.key === 'ArrowDown') {
+        curIdx = Math.min(curIdx + 1, allItems.length - 1);
+      } else {
+        curIdx = Math.max(curIdx - 1, 0);
+      }
+      var nextTarget = allItems[curIdx].dataset.target;
+      navigateTo(nextTarget);
+    }
+  });
 
   if (data.lastRunAt) {
     footer.textContent = 'Last updated ' + new Date(data.lastRunAt).toLocaleDateString();
   }
 
   buildNav();
-  showContent('overview');
+
+  // Auto-expand history section if navigating to a snapshot
+  if (window.location.hash && window.location.hash.startsWith('#history/')) {
+    var histToggle = nav.querySelector('.history-toggle');
+    var histList = nav.querySelector('.history-list');
+    if (histToggle && histList) {
+      histToggle.classList.add('expanded');
+      histList.classList.add('visible');
+    }
+  }
+
+  // Initial navigation from hash (or default to overview)
+  if (window.location.hash) {
+    onHashChange();
+  } else {
+    navigateTo('overview');
+  }
 })();
 </script>
 </body>

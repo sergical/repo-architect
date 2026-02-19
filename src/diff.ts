@@ -42,7 +42,7 @@ const IGNORE_PATTERNS = [
   /docs\/architecture\//,
 ];
 
-function isStructuralFile(filepath: string): boolean {
+export function isStructuralFile(filepath: string): boolean {
   if (IGNORE_PATTERNS.some(p => p.test(filepath))) return false;
   return STRUCTURAL_PATTERNS.some(p => p.test(filepath));
 }
@@ -95,4 +95,90 @@ export async function getGitLogSummary(repoRoot: string, sinceSha: string): Prom
     'log', '--oneline', '--no-decorate', `${sinceSha}..HEAD`,
   ], { cwd: repoRoot });
   return stdout.trim();
+}
+
+export interface ArchSnapshot {
+  commitSha: string;
+  date: string;
+  summary: string;
+  moduleCount: number;
+}
+
+export async function getArchHistory(repoRoot: string, limit = 20): Promise<ArchSnapshot[]> {
+  let logOutput: string;
+  try {
+    const { stdout } = await execFileAsync('git', [
+      'log', `--max-count=${limit}`, '--format=%H|%aI|%s', '--', 'docs/architecture/OVERVIEW.md',
+    ], { cwd: repoRoot });
+    logOutput = stdout.trim();
+  } catch {
+    return [];
+  }
+
+  if (!logOutput) return [];
+
+  const lines = logOutput.split('\n').filter(Boolean);
+  const snapshots: ArchSnapshot[] = [];
+
+  for (const line of lines) {
+    const [commitSha, date, ...summaryParts] = line.split('|');
+    const summary = summaryParts.join('|');
+
+    let moduleCount = 0;
+    try {
+      const { stdout } = await execFileAsync('git', [
+        'ls-tree', '--name-only', commitSha, 'docs/architecture/modules/',
+      ], { cwd: repoRoot });
+      moduleCount = stdout.trim().split('\n').filter(f => f.endsWith('.md')).length;
+    } catch {
+      // modules dir may not exist at this commit
+    }
+
+    snapshots.push({ commitSha, date, summary, moduleCount });
+  }
+
+  return snapshots;
+}
+
+export async function getSnapshotContent(
+  repoRoot: string,
+  commitSha: string,
+): Promise<{ overview: string; modules: { name: string; slug: string; content: string }[] }> {
+  let overview = '';
+  try {
+    const { stdout } = await execFileAsync('git', [
+      'show', `${commitSha}:docs/architecture/OVERVIEW.md`,
+    ], { cwd: repoRoot });
+    overview = stdout;
+  } catch {
+    // OVERVIEW.md may not exist at this commit
+  }
+
+  const modules: { name: string; slug: string; content: string }[] = [];
+  try {
+    const { stdout: fileList } = await execFileAsync('git', [
+      'ls-tree', '--name-only', commitSha, 'docs/architecture/modules/',
+    ], { cwd: repoRoot });
+
+    const files = fileList.trim().split('\n').filter(f => f.endsWith('.md')).sort();
+
+    for (const filePath of files) {
+      const file = filePath.replace(/^docs\/architecture\/modules\//, '');
+      try {
+        const { stdout: content } = await execFileAsync('git', [
+          'show', `${commitSha}:${filePath}`,
+        ], { cwd: repoRoot });
+        const baseName = file.replace(/\.md$/, '');
+        const name = baseName.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        const slug = baseName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        modules.push({ name, slug, content });
+      } catch {
+        // file may not be readable at this commit
+      }
+    }
+  } catch {
+    // modules dir may not exist at this commit
+  }
+
+  return { overview, modules };
 }

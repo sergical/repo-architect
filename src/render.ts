@@ -1,6 +1,11 @@
-import { mkdir, writeFile, readFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import type { AnalysisResult, IncrementalAnalysisResult, ModuleAnalysis } from './analyze.js';
+
+export interface IncrementalRenderResult {
+  writtenFiles: string[];
+  deletedFiles: string[];
+}
 
 const DOCS_DIR = 'docs/architecture';
 
@@ -30,12 +35,13 @@ export async function renderFullDocs(repoRoot: string, analysis: AnalysisResult)
 export async function renderIncrementalDocs(
   repoRoot: string,
   analysis: IncrementalAnalysisResult,
-): Promise<string[]> {
+): Promise<IncrementalRenderResult> {
   const docsDir = path.join(repoRoot, DOCS_DIR);
   const modulesDir = path.join(docsDir, 'modules');
   await mkdir(modulesDir, { recursive: true });
 
   const writtenFiles: string[] = [];
+  const deletedFiles: string[] = [];
 
   if (analysis.updatedOverview || analysis.updatedSystemMap || analysis.updatedDataFlows || analysis.updatedDependencyGraph) {
     const overviewPath = path.join(docsDir, 'OVERVIEW.md');
@@ -60,10 +66,6 @@ export async function renderIncrementalDocs(
       updated = replaceSection(updated, 'Dependency Graph', analysis.updatedDependencyGraph);
     }
 
-    if (updated === existing && analysis.updatedOverview) {
-      updated = analysis.updatedOverview;
-    }
-
     await writeFile(overviewPath, updated);
     writtenFiles.push(overviewPath);
   }
@@ -76,7 +78,19 @@ export async function renderIncrementalDocs(
     writtenFiles.push(modulePath);
   }
 
-  return writtenFiles;
+  // Delete orphaned module files
+  for (const name of analysis.deletedModules) {
+    const safeName = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const modulePath = path.join(modulesDir, `${safeName}.md`);
+    try {
+      await unlink(modulePath);
+      deletedFiles.push(modulePath);
+    } catch {
+      // file may not exist
+    }
+  }
+
+  return { writtenFiles, deletedFiles };
 }
 
 function renderOverview(analysis: AnalysisResult): string {
@@ -182,14 +196,54 @@ function renderModule(mod: ModuleAnalysis): string {
   return sections.join('\n');
 }
 
-function replaceSection(doc: string, sectionName: string, newContent: string): string {
-  const regex = new RegExp(
-    `(## ${sectionName}\\s*\\n)((?:(?!## ).)*)`,
-    's',
-  );
-  const match = doc.match(regex);
-  if (match) {
-    return doc.replace(regex, `$1\n${newContent}\n\n`);
+export function replaceSection(doc: string, sectionName: string, newContent: string): string {
+  if (!doc.trim()) {
+    return `## ${sectionName}\n\n${newContent}\n`;
   }
-  return doc;
+
+  // Split document into sections by ## headers
+  const lines = doc.split('\n');
+  const sections: { header: string; content: string; startIndex: number }[] = [];
+  let currentHeader = '';
+  let currentLines: string[] = [];
+  let currentStart = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].startsWith('## ')) {
+      if (currentHeader || currentLines.length > 0) {
+        sections.push({ header: currentHeader, content: currentLines.join('\n'), startIndex: currentStart });
+      }
+      currentHeader = lines[i].replace(/^## /, '').trim();
+      currentStart = i;
+      currentLines = [];
+    } else {
+      currentLines.push(lines[i]);
+    }
+  }
+  // Push final section
+  sections.push({ header: currentHeader, content: currentLines.join('\n'), startIndex: currentStart });
+
+  // Find section case-insensitively
+  const matchIdx = sections.findIndex(s => s.header.toLowerCase() === sectionName.toLowerCase());
+
+  if (matchIdx !== -1) {
+    // Replace matching section content
+    const result: string[] = [];
+    for (let i = 0; i < sections.length; i++) {
+      if (i === matchIdx) {
+        result.push(`## ${sections[i].header}\n\n${newContent}\n`);
+      } else {
+        if (sections[i].header) {
+          result.push(`## ${sections[i].header}${sections[i].content}`);
+        } else {
+          result.push(sections[i].content);
+        }
+      }
+    }
+    return result.join('\n');
+  }
+
+  // Section not found — append it
+  const trimmed = doc.trimEnd();
+  return `${trimmed}\n\n## ${sectionName}\n\n${newContent}\n`;
 }

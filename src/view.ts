@@ -7,6 +7,7 @@ import { platform } from 'node:os';
 import { readState } from './state.js';
 import { getViewerHtml } from './viewer-template.js';
 import type { ViewerData, ViewerModule } from './viewer-template.js';
+import { getArchHistory, getSnapshotContent } from './diff.js';
 
 export function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -41,12 +42,14 @@ export async function loadViewerData(repoRoot: string): Promise<ViewerData> {
   }
 
   const projectName = path.basename(repoRoot);
+  const history = await getArchHistory(repoRoot);
 
   return {
     projectName,
     overview,
     modules,
     lastRunAt: state?.lastRunAt ?? null,
+    history,
   };
 }
 
@@ -84,7 +87,31 @@ export async function startViewer(repoRoot: string, port?: number): Promise<void
 
   const actualPort = await findPort(port ?? 3333);
 
-  const server = createServer((req, res) => {
+  const server = createServer(async (req, res) => {
+    const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
+
+    if (url.pathname === '/api/snapshot') {
+      const sha = url.searchParams.get('sha');
+      if (!sha) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Missing sha parameter' }));
+        return;
+      }
+      try {
+        const snapshot = await getSnapshotContent(repoRoot, sha);
+        const json = JSON.stringify(snapshot);
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(json),
+        });
+        res.end(json);
+      } catch {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Failed to load snapshot' }));
+      }
+      return;
+    }
+
     res.writeHead(200, {
       'Content-Type': 'text/html; charset=utf-8',
       'Content-Length': htmlBuffer.length,

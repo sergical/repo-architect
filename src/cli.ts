@@ -288,8 +288,9 @@ async function main(): Promise<void> {
         return;
       }
 
-      // Run analysis
-      if (opts.incremental) {
+      // Run analysis — auto-detect mode when neither flag is passed
+      const useIncremental = opts.incremental || (!opts.full && await readState(repoRoot, config.outputDir) !== null);
+      if (useIncremental) {
         await runIncremental(repoRoot, opts.pr ?? false, model, config);
       } else {
         await runFull(repoRoot, opts.pr ?? false, model, config);

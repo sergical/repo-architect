@@ -21,7 +21,8 @@ export interface ViewerData {
  * innerHTML is used intentionally to render trusted local markdown content
  * via the marked library - this is standard for local dev tools.
  */
-export function getViewerHtml(data: ViewerData): string {
+export function getViewerHtml(data: ViewerData, options?: { static?: boolean }): string {
+  const isStatic = options?.static ?? false;
   const jsonPayload = JSON.stringify(data).replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
 
   return `<!DOCTYPE html>
@@ -308,7 +309,7 @@ export function getViewerHtml(data: ViewerData): string {
 
 <main class="main" id="content"></main>
 
-<script>window.__ARCH_DATA__ = ${jsonPayload};</script>
+${isStatic ? '<script>window.__STATIC_MODE__ = true;</script>\n' : ''}<script>window.__ARCH_DATA__ = ${jsonPayload};</script>
 <script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>
@@ -562,6 +563,7 @@ export function getViewerHtml(data: ViewerData): string {
   window.addEventListener('hashchange', onHashChange);
 
   async function loadSnapshot(sha) {
+    if (window.__STATIC_MODE__) return;
     if (snapshotCache[sha]) {
       snapshotData = snapshotCache[sha];
       snapshotSha = sha;
@@ -640,8 +642,8 @@ export function getViewerHtml(data: ViewerData): string {
       });
     }
 
-    // History section
-    if (data.history && data.history.length > 0) {
+    // History section (skip in static mode — no server for snapshot API)
+    if (data.history && data.history.length > 0 && !window.__STATIC_MODE__) {
       var histSection = document.createElement('div');
       histSection.className = 'history-section';
 

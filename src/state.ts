@@ -14,10 +14,10 @@ export interface ArchState {
   repoRoot: string;
 }
 
-const STATE_FILE = 'docs/architecture/.arch-state.json';
+const DEFAULT_STATE_DIR = 'docs/architecture';
 
-export async function readState(repoRoot: string): Promise<ArchState | null> {
-  const statePath = path.join(repoRoot, STATE_FILE);
+export async function readState(repoRoot: string, outputDir?: string): Promise<ArchState | null> {
+  const statePath = path.join(repoRoot, outputDir ?? DEFAULT_STATE_DIR, '.arch-state.json');
   try {
     const raw = await readFile(statePath, 'utf-8');
     return JSON.parse(raw) as ArchState;
@@ -26,8 +26,8 @@ export async function readState(repoRoot: string): Promise<ArchState | null> {
   }
 }
 
-export async function writeState(repoRoot: string, state: ArchState): Promise<void> {
-  const statePath = path.join(repoRoot, STATE_FILE);
+export async function writeState(repoRoot: string, state: ArchState, outputDir?: string): Promise<void> {
+  const statePath = path.join(repoRoot, outputDir ?? DEFAULT_STATE_DIR, '.arch-state.json');
   await mkdir(path.dirname(statePath), { recursive: true });
   await writeFile(statePath, JSON.stringify(state, null, 2) + '\n');
 }

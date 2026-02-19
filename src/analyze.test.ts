@@ -1,4 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mkdir, writeFile, rm } from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
 import { parseAnalysisResponse, parseIncrementalResponse, validateMermaid } from './analyze.js';
 
 // --- validateMermaid ---
@@ -210,5 +213,53 @@ describe('parseIncrementalResponse', () => {
     expect(result.updatedModules).toEqual([]);
     expect(result.newModules).toEqual([]);
     expect(result.deletedModules).toEqual([]);
+  });
+});
+
+// --- .env file parsing (pattern used by getApiKey) ---
+
+describe('.env file ANTHROPIC_API_KEY parsing', () => {
+  const ENV_KEY_REGEX = /^(?:export\s+)?ANTHROPIC_API_KEY=(.+)$/m;
+
+  function extractKey(envContent: string): string | null {
+    const match = envContent.match(ENV_KEY_REGEX);
+    if (match) {
+      const value = match[1].trim().replace(/^["']|["']$/g, '');
+      return value || null;
+    }
+    return null;
+  }
+
+  it('extracts bare key', () => {
+    expect(extractKey('ANTHROPIC_API_KEY=sk-ant-12345')).toBe('sk-ant-12345');
+  });
+
+  it('extracts double-quoted key', () => {
+    expect(extractKey('ANTHROPIC_API_KEY="sk-ant-12345"')).toBe('sk-ant-12345');
+  });
+
+  it('extracts single-quoted key', () => {
+    expect(extractKey("ANTHROPIC_API_KEY='sk-ant-12345'")).toBe('sk-ant-12345');
+  });
+
+  it('handles export prefix', () => {
+    expect(extractKey('export ANTHROPIC_API_KEY=sk-ant-12345')).toBe('sk-ant-12345');
+  });
+
+  it('handles export prefix with quotes', () => {
+    expect(extractKey('export ANTHROPIC_API_KEY="sk-ant-12345"')).toBe('sk-ant-12345');
+  });
+
+  it('extracts key among other env vars', () => {
+    const content = 'OTHER_VAR=hello\nANTHROPIC_API_KEY=sk-ant-12345\nANOTHER=world';
+    expect(extractKey(content)).toBe('sk-ant-12345');
+  });
+
+  it('returns null when key is not present', () => {
+    expect(extractKey('OTHER_VAR=hello\nSOMETHING=else')).toBeNull();
+  });
+
+  it('returns null for empty value', () => {
+    expect(extractKey('ANTHROPIC_API_KEY=')).toBeNull();
   });
 });

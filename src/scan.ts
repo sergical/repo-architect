@@ -9,6 +9,11 @@ export interface ScanResult {
   fileCount: number;
 }
 
+export interface ScanOptions {
+  ignore?: string[];
+  include?: string[];
+}
+
 function getRepomixBin(): string {
   return path.join(
     path.dirname(new URL(import.meta.url).pathname),
@@ -28,15 +33,28 @@ function wrapScanError(err: unknown): Error {
   return err instanceof Error ? err : new Error(String(err));
 }
 
-export async function scanRepo(repoRoot: string): Promise<ScanResult> {
+export async function scanRepo(repoRoot: string, options?: ScanOptions): Promise<ScanResult> {
+  const args = [
+    '--stdout',
+    '--style', 'xml',
+    '--compress',
+    '--no-file-summary',
+  ];
+
+  if (options?.ignore) {
+    for (const pattern of options.ignore) {
+      args.push('--ignore', pattern);
+    }
+  }
+  if (options?.include) {
+    for (const pattern of options.include) {
+      args.push('--include', pattern);
+    }
+  }
+
   let stdout: string;
   try {
-    const result = await execFileAsync(getRepomixBin(), [
-      '--stdout',
-      '--style', 'xml',
-      '--compress',
-      '--no-file-summary',
-    ], {
+    const result = await execFileAsync(getRepomixBin(), args, {
       cwd: repoRoot,
       maxBuffer: 50 * 1024 * 1024, // 50MB
     });

@@ -1,6 +1,7 @@
 export { scanRepo, scanFiles } from './scan.js';
+export type { ScanResult, ScanOptions } from './scan.js';
 export { analyzeFullRepo, analyzeIncremental, parseAnalysisResponse, parseIncrementalResponse, validateMermaid, DEFAULT_MODEL } from './analyze.js';
-export type { AnalysisResult, IncrementalAnalysisResult, ModuleAnalysis } from './analyze.js';
+export type { AnalysisResult, IncrementalAnalysisResult, ModuleAnalysis, TokenUsage, AnalyzeOptions } from './analyze.js';
 export { renderFullDocs, renderIncrementalDocs, replaceSection } from './render.js';
 export type { IncrementalRenderResult } from './render.js';
 export { readState, writeState } from './state.js';
@@ -9,5 +10,7 @@ export { getChangedFiles, getCurrentSha, getArchHistory, getSnapshotContent } fr
 export type { ArchSnapshot } from './diff.js';
 export { createArchPr } from './pr.js';
 export { setupGitHubAction } from './setup.js';
-export { startViewer } from './view.js';
+export { startViewer, exportStaticHtml, openBrowser } from './view.js';
 export type { ViewerData, ViewerModule } from './viewer-template.js';
+export { loadConfig, createDefaultConfig, DEFAULT_CONFIG } from './config.js';
+export type { RepoArchitectConfig } from './config.js';

@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile, readdir, writeFile, mkdir } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import path from 'node:path';
 import { platform } from 'node:os';
@@ -21,11 +21,12 @@ async function readFileOr(filePath: string, fallback: string): Promise<string> {
   }
 }
 
-export async function loadViewerData(repoRoot: string): Promise<ViewerData> {
-  const archDir = path.join(repoRoot, 'docs/architecture');
+export async function loadViewerData(repoRoot: string, outputDir?: string): Promise<ViewerData> {
+  const docsDir = outputDir ?? 'docs/architecture';
+  const archDir = path.join(repoRoot, docsDir);
   const modulesDir = path.join(archDir, 'modules');
 
-  const state = await readState(repoRoot);
+  const state = await readState(repoRoot, outputDir);
   const overview = await readFileOr(path.join(archDir, 'OVERVIEW.md'), '');
 
   const modules: ViewerModule[] = [];
@@ -42,7 +43,7 @@ export async function loadViewerData(repoRoot: string): Promise<ViewerData> {
   }
 
   const projectName = path.basename(repoRoot);
-  const history = await getArchHistory(repoRoot);
+  const history = await getArchHistory(repoRoot, 20, outputDir);
 
   return {
     projectName,
@@ -53,7 +54,7 @@ export async function loadViewerData(repoRoot: string): Promise<ViewerData> {
   };
 }
 
-function openBrowser(url: string): void {
+export function openBrowser(url: string): void {
   const p = platform();
   const cmd = p === 'darwin' ? 'open' : p === 'win32' ? 'cmd' : 'xdg-open';
   const args = p === 'win32' ? ['/c', 'start', '', url] : [url];
@@ -80,8 +81,8 @@ async function findPort(start: number): Promise<number> {
   throw new Error('Could not find an available port');
 }
 
-export async function startViewer(repoRoot: string, port?: number): Promise<void> {
-  const data = await loadViewerData(repoRoot);
+export async function startViewer(repoRoot: string, port?: number, outputDir?: string): Promise<void> {
+  const data = await loadViewerData(repoRoot, outputDir);
   const html = getViewerHtml(data);
   const htmlBuffer = Buffer.from(html, 'utf-8');
 
@@ -98,7 +99,7 @@ export async function startViewer(repoRoot: string, port?: number): Promise<void
         return;
       }
       try {
-        const snapshot = await getSnapshotContent(repoRoot, sha);
+        const snapshot = await getSnapshotContent(repoRoot, sha, outputDir);
         const json = JSON.stringify(snapshot);
         res.writeHead(200, {
           'Content-Type': 'application/json',
@@ -130,4 +131,17 @@ export async function startViewer(repoRoot: string, port?: number): Promise<void
     server.close();
     process.exit(0);
   });
+}
+
+export async function exportStaticHtml(
+  repoRoot: string,
+  outputPath?: string,
+  outputDir?: string,
+): Promise<string> {
+  const data = await loadViewerData(repoRoot, outputDir);
+  const html = getViewerHtml(data, { static: true });
+  const dest = outputPath ?? path.join(repoRoot, outputDir ?? 'docs/architecture', 'index.html');
+  await mkdir(path.dirname(dest), { recursive: true });
+  await writeFile(dest, html);
+  return dest;
 }

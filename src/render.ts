@@ -7,10 +7,10 @@ export interface IncrementalRenderResult {
   deletedFiles: string[];
 }
 
-const DOCS_DIR = 'docs/architecture';
+const DEFAULT_DOCS_DIR = 'docs/architecture';
 
-export async function renderFullDocs(repoRoot: string, analysis: AnalysisResult): Promise<string[]> {
-  const docsDir = path.join(repoRoot, DOCS_DIR);
+export async function renderFullDocs(repoRoot: string, analysis: AnalysisResult, outputDir?: string): Promise<string[]> {
+  const docsDir = path.join(repoRoot, outputDir ?? DEFAULT_DOCS_DIR);
   const modulesDir = path.join(docsDir, 'modules');
   await mkdir(modulesDir, { recursive: true });
 
@@ -35,8 +35,9 @@ export async function renderFullDocs(repoRoot: string, analysis: AnalysisResult)
 export async function renderIncrementalDocs(
   repoRoot: string,
   analysis: IncrementalAnalysisResult,
+  outputDir?: string,
 ): Promise<IncrementalRenderResult> {
-  const docsDir = path.join(repoRoot, DOCS_DIR);
+  const docsDir = path.join(repoRoot, outputDir ?? DEFAULT_DOCS_DIR);
   const modulesDir = path.join(docsDir, 'modules');
   await mkdir(modulesDir, { recursive: true });
 

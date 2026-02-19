@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdir, writeFile, rm, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 
-import { slugify, loadViewerData } from './view.js';
+import { slugify, loadViewerData, exportStaticHtml } from './view.js';
 import { getViewerHtml } from './viewer-template.js';
 import type { ViewerData } from './viewer-template.js';
 
@@ -114,6 +114,7 @@ describe('getViewerHtml', () => {
       { name: 'Scanner', slug: 'scanner', content: '# Scanner\n\nScanner docs.' },
     ],
     lastRunAt: '2026-02-17T10:00:00Z',
+    history: [],
   };
 
   it('generates valid HTML with doctype', () => {
@@ -198,5 +199,86 @@ describe('getViewerHtml', () => {
   it('initializes mermaid with theme-aware config', () => {
     const html = getViewerHtml(baseData);
     expect(html).toContain("theme: isDark ? 'dark' : 'default'");
+  });
+
+  it('getViewerHtml without options still works (backward compat)', () => {
+    const html = getViewerHtml(baseData);
+    expect(html).toContain('<!DOCTYPE html>');
+    // Non-static mode should NOT inject the static mode script tag
+    expect(html).not.toContain('window.__STATIC_MODE__ = true');
+  });
+
+  it('getViewerHtml with static: true includes static mode flag', () => {
+    const html = getViewerHtml(baseData, { static: true });
+    expect(html).toContain('window.__STATIC_MODE__ = true');
+  });
+
+  it('static mode loadSnapshot has guard', () => {
+    const html = getViewerHtml(baseData, { static: true });
+    // The loadSnapshot function should check for static mode
+    expect(html).toContain('if (window.__STATIC_MODE__) return;');
+  });
+
+  it('static mode buildNav skips history', () => {
+    const dataWithHistory: ViewerData = {
+      ...baseData,
+      history: [
+        { commitSha: 'abc123', date: '2026-02-17', summary: 'test commit', moduleCount: 2 },
+      ],
+    };
+    const html = getViewerHtml(dataWithHistory, { static: true });
+    // History section is guarded by !window.__STATIC_MODE__
+    expect(html).toContain('!window.__STATIC_MODE__');
+  });
+});
+
+// --- exportStaticHtml ---
+
+describe('exportStaticHtml', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await import('node:fs/promises').then(fs =>
+      fs.mkdtemp(path.join(os.tmpdir(), 'repo-arch-export-test-'))
+    );
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('writes HTML file to expected default path', async () => {
+    const archDir = path.join(tmpDir, 'docs/architecture');
+    await mkdir(archDir, { recursive: true });
+    await writeFile(path.join(archDir, 'OVERVIEW.md'), '# Test\n\nContent.');
+
+    const outputPath = await exportStaticHtml(tmpDir);
+    expect(outputPath).toBe(path.join(tmpDir, 'docs/architecture/index.html'));
+
+    const content = await readFile(outputPath, 'utf-8');
+    expect(content).toContain('<!DOCTYPE html>');
+    expect(content).toContain('__STATIC_MODE__');
+  });
+
+  it('writes HTML to custom output path', async () => {
+    const archDir = path.join(tmpDir, 'docs/architecture');
+    await mkdir(archDir, { recursive: true });
+    await writeFile(path.join(archDir, 'OVERVIEW.md'), '# Test');
+
+    const customPath = path.join(tmpDir, 'custom-output.html');
+    const outputPath = await exportStaticHtml(tmpDir, customPath);
+    expect(outputPath).toBe(customPath);
+
+    const content = await readFile(customPath, 'utf-8');
+    expect(content).toContain('<!DOCTYPE html>');
+  });
+
+  it('respects custom outputDir', async () => {
+    const customDir = path.join(tmpDir, 'custom/docs');
+    await mkdir(customDir, { recursive: true });
+    await writeFile(path.join(customDir, 'OVERVIEW.md'), '# Custom');
+
+    const outputPath = await exportStaticHtml(tmpDir, undefined, 'custom/docs');
+    expect(outputPath).toBe(path.join(tmpDir, 'custom/docs/index.html'));
   });
 });

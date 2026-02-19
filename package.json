@@ -1,6 +1,6 @@
 {
   "name": "repo-architect",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Your codebase, documented. Automatically. Every night.",
   "type": "module",
   "bin": {

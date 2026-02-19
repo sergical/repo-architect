@@ -7,6 +7,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const DEFAULT_MODEL = 'claude-sonnet-4-5-20250514';
 
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export interface AnalyzeOptions {
+  model?: string;
+  repoRoot?: string;
+}
+
 export interface ModuleAnalysis {
   name: string;
   path: string;
@@ -35,13 +45,25 @@ export interface IncrementalAnalysisResult {
   deletedModules: string[];
 }
 
-async function getApiKey(): Promise<string> {
+async function getApiKey(repoRoot?: string): Promise<string> {
   // 1. Environment variable
   if (process.env.ANTHROPIC_API_KEY) {
     return process.env.ANTHROPIC_API_KEY;
   }
 
-  // 2. Config file at ~/.repo-architect
+  // 2. .env file in repo root
+  if (repoRoot) {
+    try {
+      const envContent = await readFile(path.join(repoRoot, '.env'), 'utf-8');
+      const match = envContent.match(/^(?:export\s+)?ANTHROPIC_API_KEY=(.+)$/m);
+      if (match) {
+        const value = match[1].trim().replace(/^["']|["']$/g, '');
+        if (value) return value;
+      }
+    } catch { /* no .env */ }
+  }
+
+  // 3. Config file at ~/.repo-architect
   const home = process.env.HOME || process.env.USERPROFILE || '';
   for (const configPath of [
     path.join(home, '.repo-architect'),
@@ -67,14 +89,17 @@ async function loadPrompt(name: string): Promise<string> {
   return readFile(promptPath, 'utf-8');
 }
 
-export async function analyzeFullRepo(repoContent: string, model?: string): Promise<AnalysisResult> {
-  const client = new Anthropic({ apiKey: await getApiKey(), maxRetries: 3 });
+export async function analyzeFullRepo(
+  repoContent: string,
+  options?: AnalyzeOptions,
+): Promise<{ result: AnalysisResult; usage: TokenUsage }> {
+  const client = new Anthropic({ apiKey: await getApiKey(options?.repoRoot), maxRetries: 3 });
   const systemPrompt = await loadPrompt('analyze-full');
 
   let response: Anthropic.Message;
   try {
     response = await client.messages.create({
-      model: model ?? DEFAULT_MODEL,
+      model: options?.model ?? DEFAULT_MODEL,
       max_tokens: 16000,
       system: systemPrompt,
       messages: [
@@ -93,7 +118,12 @@ export async function analyzeFullRepo(repoContent: string, model?: string): Prom
     .map(block => block.text)
     .join('');
 
-  return parseAnalysisResponse(text);
+  const usage: TokenUsage = {
+    inputTokens: response.usage.input_tokens,
+    outputTokens: response.usage.output_tokens,
+  };
+
+  return { result: parseAnalysisResponse(text), usage };
 }
 
 export async function analyzeIncremental(
@@ -101,15 +131,15 @@ export async function analyzeIncremental(
   existingDocs: string,
   changeSummary: string,
   gitLog: string,
-  model?: string,
-): Promise<IncrementalAnalysisResult> {
-  const client = new Anthropic({ apiKey: await getApiKey(), maxRetries: 3 });
+  options?: AnalyzeOptions,
+): Promise<{ result: IncrementalAnalysisResult; usage: TokenUsage }> {
+  const client = new Anthropic({ apiKey: await getApiKey(options?.repoRoot), maxRetries: 3 });
   const systemPrompt = await loadPrompt('analyze-incremental');
 
   let response: Anthropic.Message;
   try {
     response = await client.messages.create({
-      model: model ?? DEFAULT_MODEL,
+      model: options?.model ?? DEFAULT_MODEL,
       max_tokens: 16000,
       system: systemPrompt,
       messages: [
@@ -140,7 +170,12 @@ export async function analyzeIncremental(
     .map(block => block.text)
     .join('');
 
-  return parseIncrementalResponse(text);
+  const usage: TokenUsage = {
+    inputTokens: response.usage.input_tokens,
+    outputTokens: response.usage.output_tokens,
+  };
+
+  return { result: parseIncrementalResponse(text), usage };
 }
 
 function wrapApiError(err: unknown): Error {

@@ -104,11 +104,12 @@ export interface ArchSnapshot {
   moduleCount: number;
 }
 
-export async function getArchHistory(repoRoot: string, limit = 20): Promise<ArchSnapshot[]> {
+export async function getArchHistory(repoRoot: string, limit = 20, outputDir?: string): Promise<ArchSnapshot[]> {
+  const docsDir = outputDir ?? 'docs/architecture';
   let logOutput: string;
   try {
     const { stdout } = await execFileAsync('git', [
-      'log', `--max-count=${limit}`, '--format=%H|%aI|%s', '--', 'docs/architecture/OVERVIEW.md',
+      'log', `--max-count=${limit}`, '--format=%H|%aI|%s', '--', `${docsDir}/OVERVIEW.md`,
     ], { cwd: repoRoot });
     logOutput = stdout.trim();
   } catch {
@@ -127,7 +128,7 @@ export async function getArchHistory(repoRoot: string, limit = 20): Promise<Arch
     let moduleCount = 0;
     try {
       const { stdout } = await execFileAsync('git', [
-        'ls-tree', '--name-only', commitSha, 'docs/architecture/modules/',
+        'ls-tree', '--name-only', commitSha, `${docsDir}/modules/`,
       ], { cwd: repoRoot });
       moduleCount = stdout.trim().split('\n').filter(f => f.endsWith('.md')).length;
     } catch {
@@ -143,27 +144,30 @@ export async function getArchHistory(repoRoot: string, limit = 20): Promise<Arch
 export async function getSnapshotContent(
   repoRoot: string,
   commitSha: string,
+  outputDir?: string,
 ): Promise<{ overview: string; modules: { name: string; slug: string; content: string }[] }> {
+  const docsDir = outputDir ?? 'docs/architecture';
   let overview = '';
   try {
     const { stdout } = await execFileAsync('git', [
-      'show', `${commitSha}:docs/architecture/OVERVIEW.md`,
+      'show', `${commitSha}:${docsDir}/OVERVIEW.md`,
     ], { cwd: repoRoot });
     overview = stdout;
   } catch {
     // OVERVIEW.md may not exist at this commit
   }
 
+  const modulesPath = `${docsDir}/modules/`;
   const modules: { name: string; slug: string; content: string }[] = [];
   try {
     const { stdout: fileList } = await execFileAsync('git', [
-      'ls-tree', '--name-only', commitSha, 'docs/architecture/modules/',
+      'ls-tree', '--name-only', commitSha, modulesPath,
     ], { cwd: repoRoot });
 
     const files = fileList.trim().split('\n').filter(f => f.endsWith('.md')).sort();
 
     for (const filePath of files) {
-      const file = filePath.replace(/^docs\/architecture\/modules\//, '');
+      const file = filePath.replace(new RegExp(`^${docsDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/modules/`), '');
       try {
         const { stdout: content } = await execFileAsync('git', [
           'show', `${commitSha}:${filePath}`,
